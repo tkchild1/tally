@@ -16,7 +16,8 @@ export const DEFAULT_CATEGORIES: readonly CategoryDef[] = [
   { id: 'insurance', name: 'Insurance', kind: 'expense', isFixed: true },
   { id: 'subscriptions', name: 'Subscriptions', kind: 'expense', isFixed: true },
   { id: 'groceries', name: 'Groceries', kind: 'expense', isFixed: false },
-  { id: 'dining', name: 'Dining & coffee', kind: 'expense', isFixed: false },
+  { id: 'dining', name: 'Dining', kind: 'expense', isFixed: false },
+  { id: 'tithing', name: 'Tithing', kind: 'expense', isFixed: false },
   { id: 'transport', name: 'Transport & fuel', kind: 'expense', isFixed: false },
   { id: 'shopping', name: 'Shopping', kind: 'expense', isFixed: false },
   { id: 'entertainment', name: 'Entertainment', kind: 'expense', isFixed: false },
@@ -48,6 +49,7 @@ export const DEFAULT_RULES: readonly DefaultRule[] = [
   { flow: 'income', categoryId: 'income_other', pattern: /INTEREST|DIVIDEND|CASHBACK|CASH BACK|ZELLE FROM|VENMO/ },
 
   // Spending: specific before general
+  { flow: 'spend', categoryId: 'tithing', pattern: /TITHING|\bTITHE|CHURCH OF JESUS CHRIST|\bLDS\b/ },
   { flow: 'spend', categoryId: 'dining', pattern: /UBER\s*EATS|DOORDASH|GRUBHUB|POSTMATES/ },
   { flow: 'spend', categoryId: 'subscriptions', pattern: /AMAZON PRIME|PRIME VIDEO|KINDLE UNLTD|AUDIBLE/ },
   {
@@ -100,5 +102,8 @@ export const DEFAULT_RULES: readonly DefaultRule[] = [
   { flow: 'spend', categoryId: 'fees', pattern: /\bFEE\b|INTEREST CHARGE|FINANCE CHARGE|OVERDRAFT|SERVICE CHARGE/ },
 ];
 
-/** Habit categories: repeated purchases here are not subscriptions unless the user confirms. */
-export const NOT_AUTO_SUBSCRIPTION: ReadonlySet<string> = new Set(['groceries', 'dining', 'transport', 'shopping', 'travel']);
+/** Habit categories (and giving): repeated payments here are not subscriptions unless the user confirms. */
+export const NOT_AUTO_SUBSCRIPTION: ReadonlySet<string> = new Set(['groceries', 'dining', 'transport', 'shopping', 'travel', 'tithing']);
+
+/** Spending in this category counts as tithing paid on the dashboard. */
+export const TITHING_CATEGORY = 'tithing';

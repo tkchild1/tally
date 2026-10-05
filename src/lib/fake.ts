@@ -180,6 +180,7 @@ function generateLedgers(seed: number, ledgerStart: ISODate, endDate: ISODate) {
     if (daysBetween(PAYDAY_ANCHOR, d) % 14 === 0) {
       addChecking(d, 235_000, 'ACME CORP PAYROLL ACH CREDIT EFTxxxxx9999');
     }
+    if (daysBetween(PAYDAY_ANCHOR, d) % 14 === 1) addChecking(d, -23_500, 'TITHING DONATION ONLINE ACH DEBIT');
     if (dom === 1) addChecking(d, -135_000, 'SUNSET APARTMENTS RENT ACH DEBIT WEB ID: 4455667');
     if (dom === 5) addChecking(d, -11_840, 'STATE FARM INSURANCE ACH DEBIT');
     if (dom === 15) addChecking(d, -rng.int(4_200, 13_800), 'ROCKY MOUNTAIN POWER ACH DEBIT');

@@ -150,6 +150,20 @@ describe('Milestone 2 acceptance on demo data', () => {
     expect(names).not.toContain('BEAN THERE');
     expect(subs.find((s) => s.merchant === 'NETFLIX.COM')).toMatchObject({ cadence: 'monthly', monthlyCents: 1549, active: true });
     expect(subs.find((s) => s.merchant === 'HULU')!.priceChange).not.toBeNull();
+    expect(names).not.toContain('TITHING DONATION ONLINE');
+  });
+
+  it('tithing payments land in the tithing category, and paid is about 10% of payroll', async () => {
+    const tithes = await rowsByMerchant('TITHING DONATION ONLINE');
+    expect(tithes.length).toBeGreaterThan(10);
+    expect(tithes.every((t) => t.flow === 'spend' && t.category_id === 'tithing')).toBe(true);
+    const all = await listTransactions(db, { limit: 10_000 });
+    for (const m of (await monthlyTotals(db)).filter((x) => x.month > '2025-07' && x.month < '2026-01')) {
+      const payroll = all
+        .filter((t) => t.posted_on.startsWith(m.month) && t.merchant === 'ACME CORP PAYROLL')
+        .reduce((s, t) => s + t.amount_cents, 0);
+      expect(Math.abs(m.tithing - payroll / 10)).toBeLessThanOrEqual(23_500);
+    }
   });
 
   it('the balance chart ends at the snapshot values', async () => {

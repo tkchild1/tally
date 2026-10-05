@@ -79,6 +79,9 @@ export const MIGRATIONS: readonly string[] = [
     monthly_cents integer NOT NULL CHECK (monthly_cents >= 0)
   );
   `,
+  /* 2 */ `
+  UPDATE categories SET name = 'Dining' WHERE id = 'dining' AND name = 'Dining & coffee';
+  `,
 ];
 
 export async function getSchemaVersion(db: Queryable): Promise<number> {

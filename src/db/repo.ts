@@ -1,4 +1,4 @@
-import type { Flow } from '../lib/categories';
+import { TITHING_CATEGORY, type Flow } from '../lib/categories';
 import type { AccountKind } from '../lib/qfx';
 import type { MerchantFlag } from '../lib/subscriptions';
 import type { Db, Queryable } from './client';
@@ -275,18 +275,23 @@ export interface MonthTotalRow {
   spending: number;
   fixed: number;
   variable: number;
+  /** Paid in the tithing category (positive). Also included in `spending`. */
+  tithing: number;
 }
 
 /** Income and spending per month. Transfers are excluded; refunds reduce spending. */
 export async function monthlyTotals(db: Queryable): Promise<MonthTotalRow[]> {
-  const { rows } = await db.query<MonthTotalRow>(`
-    SELECT to_char(t.posted_on, 'YYYY-MM') AS month,
+  const { rows } = await db.query<MonthTotalRow>(
+    `SELECT to_char(t.posted_on, 'YYYY-MM') AS month,
            COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'income'), 0)::int AS income,
            (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend'), 0))::int AS spending,
            (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend' AND c.is_fixed), 0))::int AS fixed,
-           (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend' AND NOT c.is_fixed), 0))::int AS variable
+           (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend' AND NOT c.is_fixed), 0))::int AS variable,
+           (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend' AND t.category_id = $1), 0))::int AS tithing
     FROM transactions t JOIN categories c ON c.id = t.category_id
-    GROUP BY 1 ORDER BY 1`);
+    GROUP BY 1 ORDER BY 1`,
+    [TITHING_CATEGORY],
+  );
   return rows;
 }
 

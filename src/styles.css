@@ -496,6 +496,32 @@ select {
   font-weight: 600;
 }
 
+.tithing {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.tithing h3 {
+  margin: 0 0 6px;
+  font-weight: 500;
+}
+.tithing-rows {
+  margin: 0;
+}
+.tithing-rows > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+.tithing-rows dd {
+  margin: 0;
+}
+.tithing-remaining {
+  border-top: 1px solid var(--border);
+  font-weight: 600;
+}
+
 /* Charts: themed through CSS so both color schemes stay readable. */
 .chart {
   margin: 0;

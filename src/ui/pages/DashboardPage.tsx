@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { balanceInputs, listAccounts, listMonths, monthlyTotals, spendingByCategory } from '../../db/repo';
 import { balanceSeries } from '../../lib/balance';
+import { TITHING_RATE_BP, tithingSummary, type TithingTotals } from '../../lib/tithing';
 import { Banner } from '../components/Banner';
 import { Card } from '../components/Card';
 import { BalanceChart, CategoryChart, IncomeSpendingChart } from '../components/Charts';
@@ -40,6 +41,7 @@ export function DashboardPage() {
       <CoverageBanners />
 
       <MonthSummary month={month} />
+      <TithingCard month={month} />
       <AccountsCard />
 
       <Card title={`Spending by category, ${formatMonth(month)}`}>
@@ -126,6 +128,54 @@ function MonthSummary({ month }: { month: string }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function TithingCard({ month }: { month: string }) {
+  const totals = useQuery((d) => monthlyTotals(d), []);
+  if (!totals.data) return null;
+  const s = tithingSummary(
+    totals.data.map((t) => ({ month: t.month, income: t.income, tithingPaid: t.tithing })),
+    month,
+  );
+  return (
+    <Card title={`Tithing (${TITHING_RATE_BP / 100}% of income)`}>
+      <div className="tithing">
+        <TithingColumn label={formatMonth(month)} t={s.month} />
+        <TithingColumn label={`${month.slice(0, 4)} to date`} t={s.yearToDate} />
+      </div>
+      <p className="muted small">
+        Based on income deposited to your accounts. Payments categorized as Tithing count as paid.
+      </p>
+    </Card>
+  );
+}
+
+function TithingColumn({ label, t }: { label: string; t: TithingTotals }) {
+  return (
+    <section aria-label={`Tithing, ${label}`}>
+      <h3 className="small muted">{label}</h3>
+      <dl className="tithing-rows">
+        <div>
+          <dt>Owed</dt>
+          <dd>
+            <Money cents={t.owed} className="money-neutral" />
+          </dd>
+        </div>
+        <div>
+          <dt>Paid</dt>
+          <dd>
+            <Money cents={t.paid} className="money-neutral" />
+          </dd>
+        </div>
+        <div className="tithing-remaining">
+          <dt>{t.remaining >= 0 ? 'Still to pay' : 'Paid ahead'}</dt>
+          <dd>
+            <Money cents={Math.abs(t.remaining)} className="money-neutral" />
+          </dd>
+        </div>
+      </dl>
+    </section>
   );
 }
 

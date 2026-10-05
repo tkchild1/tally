@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { openDb, type Db } from '../src/db/client';
 import { importFile } from '../src/db/importer';
 import { listAccounts, listTransactions } from '../src/db/repo';
-import { getSchemaVersion, MIGRATIONS } from '../src/db/schema';
+import { getSchemaVersion, migrate, MIGRATIONS } from '../src/db/schema';
 import { DEFAULT_CATEGORIES } from '../src/lib/categories';
 import { generateFakeExports } from '../src/lib/fake';
 import { CARD_EXAMPLE, CHECKING_EXAMPLE, FAKE_CARD_NUMBER } from './fixtures/examples';
@@ -21,6 +21,21 @@ describe('migrations', () => {
   it('apply cleanly on an empty DB and seed categories', async () => {
     expect(await getSchemaVersion(db)).toBe(MIGRATIONS.length);
     expect(await count('categories')).toBe(DEFAULT_CATEGORIES.length);
+  });
+
+  it('upgrading a version-1 database renames "Dining & coffee" and adds Tithing', async () => {
+    await db.exec(`
+      UPDATE categories SET name = 'Dining & coffee' WHERE id = 'dining';
+      DELETE FROM categories WHERE id = 'tithing';
+      UPDATE meta SET value = '1' WHERE key = 'schema_version';`);
+    await migrate(db);
+    const { rows } = await db.query<{ id: string; name: string }>(
+      `SELECT id, name FROM categories WHERE id IN ('dining', 'tithing') ORDER BY id`,
+    );
+    expect(rows).toEqual([
+      { id: 'dining', name: 'Dining' },
+      { id: 'tithing', name: 'Tithing' },
+    ]);
   });
 });
 
