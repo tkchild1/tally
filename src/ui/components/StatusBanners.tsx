@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { listTransferHints, markHintAsTransfer } from '../../db/repo';
+import { lastBackupDate } from '../../db/backup';
+import { countTransactions, listTransferHints, markHintAsTransfer } from '../../db/repo';
 import { daysBetween, todayISO } from '../../lib/dates';
 import { loadCoverage } from '../coverage';
 import { formatDate, plural } from '../format';
@@ -7,6 +8,7 @@ import { bumpDataVersion, useDb, useQuery } from '../hooks';
 import { Banner } from './Banner';
 
 const STALE_AFTER_DAYS = 7;
+const BACKUP_REMINDER_DAYS = 30;
 
 /** Unmatched transfer hints, with a one-tap fix. */
 export function TransferHintBanners() {
@@ -68,5 +70,20 @@ export function CoverageBanners({ showStale = true }: { showStale?: boolean }) {
         </Banner>
       )}
     </>
+  );
+}
+
+/** Monthly backup reminder: browser storage can be cleared, a backup file can't. */
+export function BackupReminderBanner() {
+  const info = useQuery(async (d) => ({ last: await lastBackupDate(d), hasData: (await countTransactions(d)) > 0 }), []);
+  if (!info.data?.hasData) return null;
+  const { last } = info.data;
+  const age = last ? daysBetween(last, todayISO()) : null;
+  if (age !== null && age < BACKUP_REMINDER_DAYS) return null;
+  return (
+    <Banner>
+      {last ? `Your last backup was ${plural(age!, 'day')} ago.` : "You haven't made a backup yet."}{' '}
+      <a href="#/settings">Back up to a file</a> in case this browser's storage is ever cleared.
+    </Banner>
   );
 }

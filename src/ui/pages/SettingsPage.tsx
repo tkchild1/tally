@@ -9,6 +9,7 @@ import {
   setCategoryFixed,
   type AccountRow,
 } from '../../db/repo';
+import { BackupCard, RestoreCard } from '../components/BackupCards';
 import { Card } from '../components/Card';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
 
@@ -16,6 +17,8 @@ export function SettingsPage() {
   return (
     <div className="page">
       <h1>Settings</h1>
+      <BackupCard />
+      <RestoreCard />
       <CategoriesCard />
       <RulesCard />
       <AccountsCard />

@@ -6,7 +6,7 @@ import { Banner } from '../components/Banner';
 import { Card } from '../components/Card';
 import { BalanceChart, CategoryChart, IncomeSpendingChart } from '../components/Charts';
 import { Money } from '../components/Money';
-import { CoverageBanners, TransferHintBanners } from '../components/StatusBanners';
+import { BackupReminderBanner, CoverageBanners, TransferHintBanners } from '../components/StatusBanners';
 import { loadDemoData } from '../demo';
 import { formatDate, formatMonth } from '../format';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
@@ -39,6 +39,7 @@ export function DashboardPage() {
 
       <TransferHintBanners />
       <CoverageBanners />
+      <BackupReminderBanner />
 
       <MonthSummary month={month} />
       <TithingCard month={month} />

@@ -662,6 +662,7 @@ select {
 }
 
 input[type='text'],
+input[type='password'],
 input[type='search'] {
   min-height: 44px;
   font: inherit;
