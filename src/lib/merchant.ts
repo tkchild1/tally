@@ -72,10 +72,12 @@ export function normalizeMerchant(name: string, memo?: string | null): string {
   if (/^AMAZON PRIME\b/.test(s)) return 'AMAZON PRIME';
   if (/^(AMAZON\.COM|AMZN\.COM)\b/.test(s)) return 'AMAZON';
 
+  // Online merchants put a phone number where the city would be ("HULU 877-555-0100 CA").
+  const hadPhone = new RegExp(PHONE.source).test(s);
   s = s.replace(PHONE, ' ').replace(STAR_REF, ' ');
   s = clean(s);
   s = stripTrailing(s);
-  s = stripCityState(s);
+  s = stripCityState(s, !hadPhone);
   s = stripTrailing(s);
 
   return s === '' ? fallback || 'UNKNOWN' : s;
@@ -86,11 +88,12 @@ function stripTrailing(s: string): string {
 }
 
 /** Drop a trailing `CITY ST`, but only when a state code is present, and never down to zero tokens. */
-function stripCityState(s: string): string {
+function stripCityState(s: string, dropCity: boolean): string {
   const tokens = s.split(' ');
   const last = tokens[tokens.length - 1];
   if (tokens.length < 2 || last === undefined || !US_STATES.has(last)) return s;
   tokens.pop();
+  if (!dropCity) return tokens.join(' ');
 
   const joined = tokens.join(' ');
   for (const city of MULTI_WORD_CITIES) {

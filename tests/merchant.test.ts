@@ -27,6 +27,9 @@ describe('normalizeMerchant: other behaviour', () => {
     ['AMAZON.COM*AB12C3 AMZN.COM/BILL WA', null, 'AMAZON'],
     ['SUNSET APARTMENTS RENT ACH DEBIT WEB ID: 4455667', null, 'SUNSET APARTMENTS RENT'],
     ['IDAHO FALLS STORE', null, 'IDAHO FALLS STORE'],
+    ['PLANET FITNESS 800-555-0142 UT', null, 'PLANET FITNESS'],
+    ['T-MOBILE*AUTO PAY 800-555-0177 WA', null, 'T-MOBILE*AUTO PAY'],
+    ['STEAMGAMES.COM 425-555-0199 WA', null, 'STEAMGAMES.COM'],
   ])('%s -> %s', (name, memo, expected) => {
     expect(normalizeMerchant(name, memo)).toBe(expected);
   });
