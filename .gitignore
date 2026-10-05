@@ -1,0 +1,30 @@
+# dependencies / build
+node_modules/
+dist/
+dev-dist/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+
+# env
+.env
+.env.*
+
+# REAL FINANCIAL DATA: never commit (README section 3, invariant 1)
+*.qfx
+*.qbo
+*.ofx
+*.csv
+*.budgetbackup.json
+exports/
+private/
+
+# Allow-list: generated FAKE sample data only
+!sample-data/
+!sample-data/*.qfx
