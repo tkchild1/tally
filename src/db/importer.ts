@@ -12,6 +12,7 @@ import {
   type ParsedStatement,
 } from '../lib/qfx';
 import type { Db, Queryable } from './client';
+import { reclassifyAll } from './reclassify';
 
 export interface StatementImportResult {
   accountId: string;
@@ -50,7 +51,12 @@ export async function accountKey(kind: AccountKind, bankId: string | null, acctI
  * Import one QFX/QBO/OFX file. Each statement is written in a single DB transaction;
  * re-importing the same or an overlapping file inserts only rows not already present.
  */
-export async function importFile(db: Db, fileName: string, text: string): Promise<FileImportResult> {
+export async function importFile(
+  db: Db,
+  fileName: string,
+  text: string,
+  opts: { reclassify?: boolean } = {},
+): Promise<FileImportResult> {
   let parsed;
   try {
     parsed = parseQfx(text);
@@ -63,12 +69,15 @@ export async function importFile(db: Db, fileName: string, text: string): Promis
   for (const stmt of parsed.statements) {
     statements.push(await db.transaction((tx) => importStatement(tx, fileName, stmt)));
   }
+  if (opts.reclassify ?? true) await reclassifyAll(db);
   return { fileName, ok: true, error: null, warnings: parsed.warnings, statements };
 }
 
+/** Import several files, then re-classify once at the end. */
 export async function importFiles(db: Db, files: Array<{ name: string; text: string }>): Promise<FileImportResult[]> {
   const results: FileImportResult[] = [];
-  for (const f of files) results.push(await importFile(db, f.name, f.text));
+  for (const f of files) results.push(await importFile(db, f.name, f.text, { reclassify: false }));
+  if (results.some((r) => r.ok)) await reclassifyAll(db);
   return results;
 }
 

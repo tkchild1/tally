@@ -21,7 +21,8 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.5.8",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
