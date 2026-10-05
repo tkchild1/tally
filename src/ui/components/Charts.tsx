@@ -2,7 +2,9 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
+  ReferenceLine,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -69,6 +71,40 @@ export function IncomeSpendingChart({ data }: { data: MonthTotalRow[] }) {
         caption="Income and spending by month"
         head={['Month', 'Income', 'Spending', 'Net']}
         rows={data.map((d) => [formatMonth(d.month), formatCents(d.income), formatCents(d.spending), formatCents(d.income - d.spending)])}
+      />
+    </figure>
+  );
+}
+
+/** Spending per month for the current filter, the selected month highlighted, with the average as a dashed line. */
+export function MonthlySpendChart({ data, selected, label }: { data: MonthTotalRow[]; selected: string; label: string }) {
+  const rows = data.map((d) => ({ month: d.month, spending: d.spending, label: formatMonth(d.month, true) }));
+  const average = rows.length ? Math.round(rows.reduce((s, r) => s + r.spending, 0) / rows.length) : 0;
+  return (
+    <figure className="chart">
+      <div aria-hidden="true">
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={rows} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="label" tickLine={false} />
+            <YAxis tickFormatter={formatCompactCents} width={52} tickLine={false} axisLine={false} />
+            <Tooltip formatter={money} labelFormatter={(_, p) => (p[0] ? formatMonth(p[0].payload.month) : '')} />
+            <ReferenceLine y={average} stroke={PALETTE.orange} strokeDasharray="6 4" />
+            <Bar dataKey="spending" name="Spent" radius={[3, 3, 0, 0]}>
+              {rows.map((r) => (
+                <Cell key={r.month} fill={PALETTE.blue} fillOpacity={r.month === selected ? 1 : 0.45} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="muted small">
+        Dashed line: monthly average, {formatCents(average)}. The selected month is darker.
+      </p>
+      <DataTable
+        caption={`Monthly spending, ${label}`}
+        head={['Month', 'Spent']}
+        rows={data.map((d) => [formatMonth(d.month), formatCents(d.spending)])}
       />
     </figure>
   );

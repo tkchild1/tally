@@ -676,6 +676,16 @@ input[type='search'] {
 .filters input[type='search'] {
   flex: 1 1 100%;
 }
+.dash-filters {
+  margin-bottom: 12px;
+}
+.dash-filters .grow {
+  flex: 1 1 180px;
+}
+.dash-filters input[type='search'] {
+  width: 100%;
+  box-sizing: border-box;
+}
 input:focus-visible {
   outline: 3px solid var(--info-border);
   outline-offset: 1px;

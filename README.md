@@ -669,6 +669,17 @@ Milestone 2 added Recharts 3. Milestone 3 added no dependencies (WebCrypto is bu
   in one transaction (a bad file changes nothing). Categories only restore `is_fixed` for ids that exist. A wrong
   passphrase and a modified file look the same to AES-GCM, so the error says "Wrong passphrase, or the file was modified."
   Encryption needs WebCrypto, which browsers only offer on HTTPS or localhost (not `http://192.168.x.x`).
+- **Dashboard filter (owner addition).** A search box and a category picker under the month picker. While a filter is on:
+  - The KPIs, the category chart (or top merchants, when a category is picked) and Income vs spending show only matching
+    transactions. Search matches the merchant, bank description or memo, case-insensitively.
+  - An "All time" card shows total, per month (over all months that have data), per purchase, the date range and top
+    merchants.
+  - Balances, tithing and banners are hidden, since they can't be filtered.
+  - The "Monthly spending" chart (always shown) follows the filter, with zero-filled months and a dashed monthly average.
+
+  The demo data includes two fake golf merchants so "golf" has something to find.
+- **Import picker has no `accept` filter.** iOS doesn't recognize `.qfx`, so a filter greys out every file; the parser
+  already rejects files that aren't OFX, with a clear message.
 - **Saving the backup file:** a normal download, plus a "Share / Save to Files" button when the browser can share files
   (iPhone), since downloads from a Home Screen app are unreliable on some iOS versions.
 - **Backup reminder:** the dashboard nudges when there is data and no backup in 30 days (`meta.last_backup_on`, set when a

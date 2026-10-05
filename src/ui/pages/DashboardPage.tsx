@@ -1,25 +1,50 @@
-import { useState } from 'react';
-import { balanceInputs, listAccounts, listMonths, monthlyTotals, spendingByCategory } from '../../db/repo';
+import { useEffect, useState } from 'react';
+import {
+  balanceInputs,
+  filterSummary,
+  listAccounts,
+  listCategories,
+  listMonths,
+  monthlyTotals,
+  spendingByCategory,
+  topMerchants,
+  type DashboardFilter,
+  type MonthTotalRow,
+} from '../../db/repo';
 import { balanceSeries } from '../../lib/balance';
+import { prettyMerchant } from '../../lib/merchant';
 import { TITHING_RATE_BP, tithingSummary, type TithingTotals } from '../../lib/tithing';
 import { Banner } from '../components/Banner';
 import { Card } from '../components/Card';
-import { BalanceChart, CategoryChart, IncomeSpendingChart } from '../components/Charts';
+import { BalanceChart, CategoryChart, IncomeSpendingChart, MonthlySpendChart } from '../components/Charts';
 import { Money } from '../components/Money';
 import { BackupReminderBanner, CoverageBanners, TransferHintBanners } from '../components/StatusBanners';
 import { loadDemoData } from '../demo';
-import { formatDate, formatMonth } from '../format';
+import { formatDate, formatMonth, plural } from '../format';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
 
 const CHART_MONTHS = 12;
 
 export function DashboardPage() {
   const months = useQuery((d) => listMonths(d), []);
+  const categories = useQuery((d) => listCategories(d), []);
   const [picked, setPicked] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 250);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
   if (months.data === undefined) return <div className="page" />;
   if (months.data.length === 0) return <EmptyDashboard />;
   const month = picked && months.data.includes(picked) ? picked : months.data[0]!;
+  const filter: DashboardFilter = { search: search || undefined, categoryId: categoryId || undefined };
+  const filtered = Boolean(filter.search || filter.categoryId);
+  const categoryName = categories.data?.find((c) => c.id === categoryId)?.name;
+  const filterLabel = [categoryName, search && `“${search}”`].filter(Boolean).join(', ') || 'all spending';
 
   return (
     <div className="page">
@@ -37,24 +62,173 @@ export function DashboardPage() {
         </label>
       </div>
 
-      <TransferHintBanners />
-      <CoverageBanners />
-      <BackupReminderBanner />
+      <div className="filters dash-filters" role="search">
+        <label className="grow">
+          <span className="visually-hidden">Filter the dashboard</span>
+          <input
+            type="search"
+            placeholder="Filter, e.g. golf"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            enterKeyHint="search"
+          />
+        </label>
+        <label>
+          <span className="visually-hidden">Category</span>
+          <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            <option value="">All categories</option>
+            {categories.data
+              ?.filter((c) => c.kind !== 'system')
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+        </label>
+      </div>
 
-      <MonthSummary month={month} />
-      <TithingCard month={month} />
-      <AccountsCard />
+      {filtered ? (
+        <Banner>
+          <p>
+            Showing only <strong>{filterLabel}</strong>. Balances and tithing are hidden while filtering.
+          </p>
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            onClick={() => {
+              setSearchInput('');
+              setSearch('');
+              setCategoryId('');
+            }}
+          >
+            Clear filter
+          </button>
+        </Banner>
+      ) : (
+        <>
+          <TransferHintBanners />
+          <CoverageBanners />
+          <BackupReminderBanner />
+        </>
+      )}
 
-      <Card title={`Spending by category, ${formatMonth(month)}`}>
-        <CategorySection month={month} />
+      <MonthSummary month={month} filter={filter} />
+      {filtered && <FilterSummaryCard filter={filter} label={filterLabel} monthCount={months.data.length} />}
+      {!filtered && <TithingCard month={month} />}
+      {!filtered && <AccountsCard />}
+
+      <Card title={`Monthly spending, ${filterLabel}`}>
+        <MonthlySpendSection filter={filter} month={month} label={filterLabel} />
       </Card>
+      {filter.categoryId ? (
+        <Card title={`Top merchants, ${formatMonth(month)}`}>
+          <MerchantList filter={filter} month={month} />
+        </Card>
+      ) : (
+        <Card title={`Spending by category, ${formatMonth(month)}`}>
+          <CategorySection month={month} filter={filter} />
+        </Card>
+      )}
       <Card title="Income vs spending">
-        <TrendSection />
+        <TrendSection filter={filter} />
       </Card>
-      <Card title="Balance over time">
-        <BalanceSection />
-      </Card>
+      {!filtered && (
+        <Card title="Balance over time">
+          <BalanceSection />
+        </Card>
+      )}
     </div>
+  );
+}
+
+/** Every month that has any data, oldest first, with zeros where the filter matched nothing. */
+function useFilteredMonths(filter: DashboardFilter): MonthTotalRow[] | undefined {
+  const q = useQuery(
+    async (d) => {
+      const [months, totals] = await Promise.all([listMonths(d), monthlyTotals(d, filter)]);
+      const byMonth = new Map(totals.map((t) => [t.month, t]));
+      return months
+        .slice()
+        .reverse()
+        .map((m) => byMonth.get(m) ?? { month: m, income: 0, spending: 0, fixed: 0, variable: 0, tithing: 0 });
+    },
+    [filter.search, filter.categoryId],
+  );
+  return q.data;
+}
+
+function MonthlySpendSection({ filter, month, label }: { filter: DashboardFilter; month: string; label: string }) {
+  const rows = useFilteredMonths(filter);
+  if (!rows) return null;
+  if (rows.every((t) => t.spending <= 0)) return <p className="muted">No spending matches this filter.</p>;
+  return <MonthlySpendChart data={rows.slice(-CHART_MONTHS)} selected={month} label={label} />;
+}
+
+function MerchantList({ filter, month }: { filter: DashboardFilter; month?: string }) {
+  const rows = useQuery((d) => topMerchants(d, filter, month), [filter.search, filter.categoryId, month]);
+  if (!rows.data) return null;
+  if (rows.data.length === 0) return <p className="muted">No spending matches{month ? ' this month' : ''}.</p>;
+  return (
+    <ul className="list">
+      {rows.data.map((m) => (
+        <li key={m.merchant} className="list-row">
+          <div>
+            <div>{prettyMerchant(m.merchant)}</div>
+            <div className="muted small">{plural(m.count, 'transaction')}</div>
+          </div>
+          <Money cents={m.total} className="money-neutral" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function FilterSummaryCard({ filter, label, monthCount }: { filter: DashboardFilter; label: string; monthCount: number }) {
+  const summary = useQuery((d) => filterSummary(d, filter), [filter.search, filter.categoryId]);
+  const s = summary.data;
+  if (!s) return null;
+  return (
+    <Card title={`All time, ${label}`}>
+      {s.first === null ? (
+        <p className="muted">Nothing matches this filter.</p>
+      ) : (
+        <>
+          <dl className="totals">
+            <div>
+              <dt>Total spent</dt>
+              <dd>
+                <Money cents={s.spent} className="money-neutral" />
+              </dd>
+            </div>
+            <div>
+              <dt>Per month</dt>
+              <dd>
+                <Money cents={Math.round(s.spent / Math.max(1, monthCount))} className="money-neutral" />
+              </dd>
+            </div>
+            <div>
+              <dt>Per purchase</dt>
+              <dd>
+                <Money cents={s.purchases ? Math.round(s.spent / s.purchases) : 0} className="money-neutral" />
+              </dd>
+            </div>
+          </dl>
+          <p className="muted small">
+            {plural(s.purchases, 'purchase')} from {formatDate(s.first)} to {formatDate(s.last!)}, averaged over{' '}
+            {plural(monthCount, 'month')} of data.
+            {s.income > 0 && (
+              <>
+                {' '}
+                Money in: <Money cents={s.income} className="money-neutral" />.
+              </>
+            )}
+          </p>
+          <h3 className="small muted">Top merchants</h3>
+          <MerchantList filter={filter} />
+        </>
+      )}
+    </Card>
   );
 }
 
@@ -92,10 +266,10 @@ function EmptyDashboard() {
   );
 }
 
-function MonthSummary({ month }: { month: string }) {
-  const totals = useQuery((d) => monthlyTotals(d), []);
-  const t = totals.data?.find((x) => x.month === month);
-  if (!t) return null;
+function MonthSummary({ month, filter }: { month: string; filter: DashboardFilter }) {
+  const totals = useQuery((d) => monthlyTotals(d, filter), [filter.search, filter.categoryId]);
+  if (!totals.data) return null;
+  const t = totals.data.find((x) => x.month === month) ?? { month, income: 0, spending: 0, fixed: 0, variable: 0, tithing: 0 };
   const net = t.income - t.spending;
   const fixedShare = t.spending > 0 ? Math.round((Math.max(0, t.fixed) / t.spending) * 100) : 0;
 
@@ -115,18 +289,24 @@ function MonthSummary({ month }: { month: string }) {
       </div>
       <div className="kpi kpi-wide">
         <span className="kpi-label">Fixed vs variable spending</span>
-        <div className="split" role="img" aria-label={`Fixed ${fixedShare} percent, variable ${100 - fixedShare} percent`}>
-          <span className="split-fixed" style={{ width: `${fixedShare}%` }} />
-        </div>
-        <div className="split-legend small">
-          <span>
-            <span className="swatch swatch-fixed" aria-hidden="true" /> Fixed <Money cents={t.fixed} className="money-neutral" />
-          </span>
-          <span>
-            <span className="swatch swatch-variable" aria-hidden="true" /> Variable{' '}
-            <Money cents={t.variable} className="money-neutral" />
-          </span>
-        </div>
+        {t.spending <= 0 ? (
+          <p className="muted small">No spending this month.</p>
+        ) : (
+          <>
+            <div className="split" role="img" aria-label={`Fixed ${fixedShare} percent, variable ${100 - fixedShare} percent`}>
+              <span className="split-fixed" style={{ width: `${fixedShare}%` }} />
+            </div>
+            <div className="split-legend small">
+              <span>
+                <span className="swatch swatch-fixed" aria-hidden="true" /> Fixed <Money cents={t.fixed} className="money-neutral" />
+              </span>
+              <span>
+                <span className="swatch swatch-variable" aria-hidden="true" /> Variable{' '}
+                <Money cents={t.variable} className="money-neutral" />
+              </span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -225,17 +405,17 @@ function AccountsCard() {
   );
 }
 
-function CategorySection({ month }: { month: string }) {
-  const rows = useQuery((d) => spendingByCategory(d, month), [month]);
+function CategorySection({ month, filter }: { month: string; filter: DashboardFilter }) {
+  const rows = useQuery((d) => spendingByCategory(d, month, filter), [month, filter.search, filter.categoryId]);
   if (!rows.data) return null;
   if (rows.data.length === 0) return <p className="muted">No spending this month.</p>;
   return <CategoryChart data={rows.data} />;
 }
 
-function TrendSection() {
-  const totals = useQuery((d) => monthlyTotals(d), []);
-  if (!totals.data) return null;
-  return <IncomeSpendingChart data={totals.data.slice(-CHART_MONTHS)} />;
+function TrendSection({ filter }: { filter: DashboardFilter }) {
+  const rows = useFilteredMonths(filter);
+  if (!rows) return null;
+  return <IncomeSpendingChart data={rows.slice(-CHART_MONTHS)} />;
 }
 
 function BalanceSection() {
