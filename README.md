@@ -3,7 +3,21 @@
 > **This README is the build spec.** It is written so an AI coding agent (Cursor) can build the whole
 > app from it, and so a human can understand every design decision later. Read it fully before writing code.
 
-**Status:** Milestones 1 (foundation and import) and 2 (classification, dashboard, subscriptions) are complete. See section 19 for where the build refines this spec.
+**Status:** Milestones 1 (foundation and import), 2 (classification, dashboard, subscriptions), and 3 (backup, PWA install,
+deploy) are built; Milestone 3's on-iPhone checks are for the owner (below). See section 19 for where the build refines this spec.
+
+**Live app:** https://tkchild1.github.io/tally/ (deployed by GitHub Actions on every push to `main`).
+
+### Install on iPhone
+1. Open the live app link in **Safari** (not Chrome; only Safari can add web apps to the Home Screen).
+2. Tap **Share** (the square with an arrow), then **Add to Home Screen**, then **Add**.
+3. Open Tally **from the Home Screen icon** and import your exports there. The Home Screen app and the Safari tab keep
+   separate data, and only the Home Screen app is protected from Safari's 7-day storage cleanup.
+4. Settings > Storage should say persistent storage is granted (iOS may only grant it to the Home Screen app).
+5. Check offline: turn on Airplane Mode, close Tally fully (swipe it away), reopen it. It should open with your data.
+6. Back up monthly: Settings > Backup with a passphrase, then save the file to iCloud Drive or Files.
+
+Updates install themselves: after a new version is deployed, the next launch (sometimes the one after) picks it up.
 
 ```
 npm install
@@ -412,7 +426,7 @@ Order (first match wins), after flow is decided:
 4. Fallback: `income_other` for income, `uncategorized` for spend.
 
 Default categories (id, name, kind, fixed?): `income_paycheck` Paycheck, `income_other` Other income, `housing` (fixed), `utilities` Utilities & phone (fixed),
-`insurance` (fixed), `subscriptions` (fixed), `groceries`, `dining` Dining & coffee, `transport` Transport & fuel, `shopping`, `entertainment`, `health`, `education`,
+`insurance` (fixed), `subscriptions` (fixed), `groceries`, `dining` Dining, `tithing` Tithing, `transport` Transport & fuel, `shopping`, `entertainment`, `health`, `education`,
 `travel`, `fees` Fees & interest, `uncategorized`, `transfer` (system). Seed them into `categories` on first run.
 
 Seed `DEFAULT_RULES` with common merchants (Walmart/Costco/Smith's -> groceries; Chipotle/Starbucks/Cafe Rio/DoorDash -> dining; Shell/Chevron/Maverik/Uber -> transport; Netflix/Spotify/
@@ -427,7 +441,7 @@ Pure. Considers spending rows with negative amounts, grouped by `merchant`.
   weekly 6-8 days, biweekly 13-16, monthly 27-35, quarterly 84-98, yearly 350-380. At least **75% of gaps** must lie in the band.
 - Minimum charges: weekly/biweekly 4, monthly/quarterly 3, **yearly 2**.
 - **Stable amount:** >= 75% of charges within `max(10%, $1)` of the median. This deliberately excludes variable bills (electricity); they are bills, not subscriptions.
-- **Exclude habit categories** (`groceries, dining, transport, shopping, travel`) unless the user confirmed the merchant. A weekly coffee is not a subscription.
+- **Exclude habit categories** (`groceries, dining, transport, shopping, travel`, plus `tithing`) unless the user confirmed the merchant. A weekly coffee is not a subscription.
 - `merchant_flags`: `dismissed` hides always; `confirmed` includes even habit categories and relaxes the minimum charge count (cadence and stability still required).
 - Output per subscription: merchant, cadence, typical amount (median), monthly equivalent (`typical x perYear / 12`), yearly cost, last charged, **next expected** (calendar-month math for monthly/quarterly/yearly),
   charges count, `active` (last charge within 1.5x the nominal period of `today`) vs `lapsed`, and a **price-change** indicator when the latest charge differs from the previous one by more than `max(2%, $0.50)`.
@@ -623,7 +637,7 @@ two yearly charges 365 days apart -> detected as yearly; price change flagged; l
 ## 19. Implementation notes (where the build refines this spec)
 
 Installed versions at Milestone 1: TypeScript 7, Vite 8, Vitest 5, React 19, PGlite 0.5, vite-plugin-pwa 2.
-Milestone 2 added Recharts 3.
+Milestone 2 added Recharts 3. Milestone 3 added no dependencies (WebCrypto is built in).
 
 - **Two TypeScript projects.** `tsconfig.app.json` covers `src/` (DOM types, no Node types); `tsconfig.node.json` covers
   `tests/`, `scripts/`, and the config files. `npm run typecheck` runs both. `npm run build` = typecheck + `vite build`.
@@ -642,8 +656,27 @@ Milestone 2 added Recharts 3.
 - **Balance series** starts at the earliest transaction or snapshot, whichever is first, and ends at the latest snapshot.
 - **Same merchant, different spellings.** Normalization is heuristic: `SMITHS FOOD` (debit) and `SMITH'S FOOD` (card) are
   separate merchants, each needing its own rule. Both already fall under the default groceries rule.
-- **Pulled forward from Milestone 3:** account rename, storage status, app version, and Erase all data are in Settings
-  already. Backup/restore is still Milestone 3.
+- **Pulled forward from Milestone 3:** account rename, storage status, app version, and Erase all data are in Settings.
+- **"Dining & coffee" is now "Dining"** (owner request). Migration 2 renames it in existing databases; the id stays `dining`.
+- **Tithing (owner addition, not in the original spec).** A `tithing` expense category (default rule matches
+  `TITHING`, `TITHE`, `CHURCH OF JESUS CHRIST`, `LDS`; otherwise teach it with "Apply to all"). The dashboard's Tithing card
+  shows, for the selected month and the year to date: owed = 10% of income (`src/lib/tithing.ts`, rounded per month),
+  paid = spending in the tithing category, and still to pay (or paid ahead). Income means deposits classified as income,
+  so it is based on take-home pay as the bank sees it, not gross pay. Tithing payments still count as spending, and are
+  never auto-detected as subscriptions. The demo data pays $235 the day after each paycheck.
+- **Backup** (`src/lib/backup.ts` pure format + crypto, `src/db/backup.ts` export/restore). Export uses `json_agg`, so dates
+  are `YYYY-MM-DD` text. Restore inserts with `jsonb_populate_recordset`, resets the serial sequences, and re-classifies, all
+  in one transaction (a bad file changes nothing). Categories only restore `is_fixed` for ids that exist. A wrong
+  passphrase and a modified file look the same to AES-GCM, so the error says "Wrong passphrase, or the file was modified."
+  Encryption needs WebCrypto, which browsers only offer on HTTPS or localhost (not `http://192.168.x.x`).
+- **Saving the backup file:** a normal download, plus a "Share / Save to Files" button when the browser can share files
+  (iPhone), since downloads from a Home Screen app are unreliable on some iOS versions.
+- **Backup reminder:** the dashboard nudges when there is data and no backup in 30 days (`meta.last_backup_on`, set when a
+  backup is downloaded).
+- **Deploy:** GitHub Pages via `.github/workflows/deploy.yml` (tests, then build with `VITE_BASE=/<repo>/`). CI runs
+  typecheck, tests, and build on pushes and PRs. Note: every GitHub Pages site of one user shares the origin
+  `tkchild1.github.io`, and browser storage is per origin. Don't host other, untrusted pages under that account, or move
+  to Cloudflare Pages (its own origin) if that ever matters.
 - **Defense in depth for account numbers.** Besides sanitizing FITIDs, the importer also scrubs the full account number
   out of `raw_name`/`raw_memo` if it ever appears there. Account ids with fewer than 6 digits (already masked, like
   `x5555`) are left alone, since `5555` could legitimately appear elsewhere.
