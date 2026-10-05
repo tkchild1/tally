@@ -3,7 +3,7 @@
 > **This README is the build spec.** It is written so an AI coding agent (Cursor) can build the whole
 > app from it, and so a human can understand every design decision later. Read it fully before writing code.
 
-**Status:** Milestone 1 (foundation and import) is complete. See section 19 for where the build refines this spec.
+**Status:** Milestones 1 (foundation and import) and 2 (classification, dashboard, subscriptions) are complete. See section 19 for where the build refines this spec.
 
 ```
 npm install
@@ -623,13 +623,27 @@ two yearly charges 365 days apart -> detected as yearly; price change flagged; l
 ## 19. Implementation notes (where the build refines this spec)
 
 Installed versions at Milestone 1: TypeScript 7, Vite 8, Vitest 5, React 19, PGlite 0.5, vite-plugin-pwa 2.
+Milestone 2 added Recharts 3.
 
 - **Two TypeScript projects.** `tsconfig.app.json` covers `src/` (DOM types, no Node types); `tsconfig.node.json` covers
   `tests/`, `scripts/`, and the config files. `npm run typecheck` runs both. `npm run build` = typecheck + `vite build`.
 - **`Queryable` also has `exec(sql)`.** Migrations are multi-statement scripts, which need `exec`. PGlite and its
   transaction handle both provide it.
-- **Classification arrives in Milestone 2.** Until then the importer stores placeholder values (`flow = 'spend'`,
-  `category_id = 'uncategorized'`), and step 3 of section 8 (re-classify everything) is not wired up yet.
+- **Re-classification also runs when the app opens**, not just after imports, so improved rules in a new app version
+  apply to data imported earlier. It writes only rows whose values changed. Merchant names are computed at import time
+  and are not re-normalized; use Settings > Erase all data and re-import to pick up normalization changes.
+- **"Apply to all" creates an `equals` rule** for the merchant. The edited row itself stays `auto` and is governed by
+  the rule, so deleting the rule reverts it along with the rest. Without "Apply to all" the row is locked (`user`).
+- **Changing the type (flow) always locks the row's flow**; there are no flow rules.
+- **"Track as a subscription"** in the transaction sheet is the same as Confirm on the Subscriptions page. Confirmed
+  merchants need only 2 charges and skip the "habit category" exclusion.
+- **Price change** compares the latest charge with the previous one (section 9.5), so the badge appears only right after
+  a change. In the demo data Hulu rises $1 every January and July.
+- **Balance series** starts at the earliest transaction or snapshot, whichever is first, and ends at the latest snapshot.
+- **Same merchant, different spellings.** Normalization is heuristic: `SMITHS FOOD` (debit) and `SMITH'S FOOD` (card) are
+  separate merchants, each needing its own rule. Both already fall under the default groceries rule.
+- **Pulled forward from Milestone 3:** account rename, storage status, app version, and Erase all data are in Settings
+  already. Backup/restore is still Milestone 3.
 - **Defense in depth for account numbers.** Besides sanitizing FITIDs, the importer also scrubs the full account number
   out of `raw_name`/`raw_memo` if it ever appears there. Account ids with fewer than 6 digits (already masked, like
   `x5555`) are left alone, since `5555` could legitimately appear elsewhere.
