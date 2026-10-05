@@ -1,11 +1,11 @@
 import { useRef, useState, type DragEvent } from 'react';
 import { importFiles, type FileImportResult } from '../../db/importer';
-import { listAccounts } from '../../db/repo';
-import { todayISO } from '../../lib/dates';
-import { generateFakeExports } from '../../lib/fake';
 import { Banner } from '../components/Banner';
 import { Card } from '../components/Card';
 import { Money } from '../components/Money';
+import { CoverageBanners, TransferHintBanners } from '../components/StatusBanners';
+import { loadCoverage } from '../coverage';
+import { loadDemoData } from '../demo';
 import { formatDate, formatRange, plural } from '../format';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
 
@@ -18,12 +18,12 @@ export function ImportPage() {
   const [results, setResults] = useState<FileImportResult[] | null>(null);
   const [demo, setDemo] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const accounts = useQuery((d) => listAccounts(d), []);
+  const coverage = useQuery((d) => loadCoverage(d), []);
 
-  async function run(files: Array<{ name: string; text: string }>, isDemo: boolean) {
+  async function run(load: () => Promise<FileImportResult[]>, isDemo: boolean) {
     setBusy(true);
     try {
-      setResults(await importFiles(db, files));
+      setResults(await load());
       setDemo(isDemo);
       bumpDataVersion();
     } finally {
@@ -34,7 +34,7 @@ export function ImportPage() {
   async function onFiles(list: FileList | null) {
     if (!list || list.length === 0) return;
     const files = await Promise.all(Array.from(list, async (f) => ({ name: f.name, text: await f.text() })));
-    await run(files, false);
+    await run(() => importFiles(db, files), false);
     if (inputRef.current) inputRef.current.value = '';
   }
 
@@ -45,11 +45,7 @@ export function ImportPage() {
   }
 
   function loadDemo() {
-    const files = generateFakeExports({ seed: 42, endDate: todayISO(), months: 7 }).map((f) => ({
-      name: f.fileName,
-      text: f.text,
-    }));
-    void run(files, true);
+    void run(() => loadDemoData(db), true);
   }
 
   return (
@@ -94,22 +90,32 @@ export function ImportPage() {
         </section>
       )}
 
-      <Card title="Accounts">
-        {accounts.data && accounts.data.length > 0 ? (
-          <ul className="list">
-            {accounts.data.map((a) => (
-              <li key={a.id} className="list-row">
-                <div>
-                  <div>{a.display_name}</div>
-                  <div className="muted small">
-                    {plural(a.txn_count, 'transaction')}
-                    {a.balance_as_of && ` · balance as of ${formatDate(a.balance_as_of)}`}
+      <TransferHintBanners />
+      <CoverageBanners />
+
+      <Card title="Accounts and coverage">
+        {coverage.data && coverage.data.accounts.length > 0 ? (
+          <>
+            <ul className="list">
+              {coverage.data.accounts.map(({ account: a, ranges, gaps }) => (
+                <li key={a.id} className="list-row">
+                  <div>
+                    <div>{a.display_name}</div>
+                    <div className="muted small">
+                      {plural(a.txn_count, 'transaction')}
+                      {a.balance_as_of && ` · balance as of ${formatDate(a.balance_as_of)}`}
+                    </div>
+                    <div className="small">
+                      Covered: {ranges.map((r) => formatRange(r.start, r.end)).join('; ') || 'unknown'}
+                      {gaps.length > 0 && <strong className="gap-flag"> · {plural(gaps.length, 'gap')}</strong>}
+                    </div>
                   </div>
-                </div>
-                {a.balance_cents !== null && <Money cents={a.balance_cents} />}
-              </li>
-            ))}
-          </ul>
+                  {a.balance_cents !== null && <Money cents={a.balance_cents} className="money-neutral" />}
+                </li>
+              ))}
+            </ul>
+            {coverage.data.lastImport && <p className="muted small">Last import {formatDate(coverage.data.lastImport)}</p>}
+          </>
         ) : (
           <p className="muted">No accounts yet. Import a file or load demo data.</p>
         )}
