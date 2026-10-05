@@ -110,7 +110,8 @@ describe('learning from corrections', () => {
 });
 
 describe('Milestone 2 acceptance on demo data', () => {
-  const END = '2026-01-02';
+  // Just after the January Hulu price rise, so the latest Hulu charge carries a price change.
+  const END = '2026-01-25';
 
   beforeEach(async () => {
     await importFiles(

@@ -212,7 +212,7 @@ function generateLedgers(seed: number, ledgerStart: ISODate, endDate: ISODate) {
     if (dom === 12) addCard(d, -1_199, 'Spotify USA New York NY');
     if (dom === 16) addCard(d, -299, 'APPLE.COM/BILL 866-555-0123 CA');
     if (dom === 20) {
-      // Price goes up $1 every six months, so any multi-month export shows a price change.
+      // Price goes up $1 every January and July; the badge shows only when the latest charge is the first at a new price.
       const halfYearsSince2024 = Math.floor((monthIndex - 2024 * 12) / 6);
       addCard(d, -(1_599 + 100 * halfYearsSince2024), 'HULU 877-555-0100 CA');
     }
