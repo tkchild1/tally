@@ -9,8 +9,6 @@ import { loadDemoData } from '../demo';
 import { formatDate, formatRange, plural } from '../format';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
 
-const ACCEPT = '.qfx,.qbo,.ofx';
-
 export function ImportPage() {
   const db = useDb();
   const [busy, setBusy] = useState(false);
@@ -64,7 +62,7 @@ export function ImportPage() {
         <input
           ref={inputRef}
           type="file"
-          accept={ACCEPT}
+          // No `accept` filter: iOS doesn't know the .qfx type and greys every file out. The parser rejects non-OFX files.
           multiple
           disabled={busy}
           onChange={(e) => void onFiles(e.target.files)}
@@ -73,6 +71,10 @@ export function ImportPage() {
         <span className="dropzone-title">{busy ? 'Importing…' : 'Choose QFX files'}</span>
         <span className="muted">or drop them here (.qfx, .qbo, .ofx). Files are read on this device only.</span>
       </label>
+      <p className="muted small">
+        First download the files from your bank's website (on a phone they land in the Files app, under Downloads). Then
+        choose them here; you can pick several at once.
+      </p>
 
       <div className="row-actions">
         <button type="button" className="btn btn-secondary" onClick={loadDemo} disabled={busy}>
