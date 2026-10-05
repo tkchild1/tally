@@ -3,6 +3,19 @@
 > **This README is the build spec.** It is written so an AI coding agent (Cursor) can build the whole
 > app from it, and so a human can understand every design decision later. Read it fully before writing code.
 
+**Status:** Milestone 1 (foundation and import) is complete. See section 19 for where the build refines this spec.
+
+```
+npm install
+npm run dev          # http://localhost:5173  (dev:phone exposes it on your Wi-Fi)
+npm test             # Vitest, fake data only
+npm run typecheck
+npm run build
+npm run fake         # regenerate sample-data/*.qfx (fake)
+npm run redact -- path/to/file.qfx [--scrub-names] [--scrub-amounts]
+npm run icons        # regenerate public/*.png icons
+```
+
 ---
 
 ## 0. How to use this with Cursor
@@ -604,3 +617,32 @@ two yearly charges 365 days apart -> detected as yearly; price change flagged; l
 8. **Testing with synthetic data:** deterministic fake generator that mirrors real quirks; redaction tool so real files never leave the machine.
 9. **Money and dates correctness:** integer cents, calendar dates not timestamps (timezone bug avoided), bigint/DATE driver gotchas.
 10. **PWA constraints on iOS:** HTTPS/service worker requirements, storage eviction rules, separate home-screen storage, backup as the safety net.
+
+---
+
+## 19. Implementation notes (where the build refines this spec)
+
+Installed versions at Milestone 1: TypeScript 7, Vite 8, Vitest 5, React 19, PGlite 0.5, vite-plugin-pwa 2.
+
+- **Two TypeScript projects.** `tsconfig.app.json` covers `src/` (DOM types, no Node types); `tsconfig.node.json` covers
+  `tests/`, `scripts/`, and the config files. `npm run typecheck` runs both. `npm run build` = typecheck + `vite build`.
+- **`Queryable` also has `exec(sql)`.** Migrations are multi-statement scripts, which need `exec`. PGlite and its
+  transaction handle both provide it.
+- **Classification arrives in Milestone 2.** Until then the importer stores placeholder values (`flow = 'spend'`,
+  `category_id = 'uncategorized'`), and step 3 of section 8 (re-classify everything) is not wired up yet.
+- **Defense in depth for account numbers.** Besides sanitizing FITIDs, the importer also scrubs the full account number
+  out of `raw_name`/`raw_memo` if it ever appears there. Account ids with fewer than 6 digits (already masked, like
+  `x5555`) are left alone, since `5555` could legitimately appear elsewhere.
+- **Merchant normalization, phone rule.** Online merchants put a phone number where the city would be
+  (`PLANET FITNESS 800-555-0142 UT`). When a phone number was removed, only the state code is dropped, not a "city" word.
+- **Fake generator.** The ledger is generated day by day from a fixed `ledgerStart` (default `2025-01-01`), so exports with
+  different end dates agree on every overlapping day (same FITIDs). That is what the overlapping-import test relies on.
+  The demo button uses today's date as the end date.
+- **Redaction of FITIDs.** Digit runs of 12+ inside `FITID` become a short letter-only hash instead of `X`s, so redacted
+  FITIDs stay unique (dedupe still works on redacted files). Elsewhere they become `X...` + last 4.
+- **Test fixtures are `.ts` files** (`tests/fixtures/examples.ts`), so the `*.qfx` ignore rule needs no exceptions
+  beyond `sample-data/`.
+- **Icons** are drawn by `scripts/generate-icons.ts` (no image dependencies), opaque as iOS requires.
+- **Multi-tab guard** is implemented: an exclusive Web Lock (`navigator.locks`) is held for the life of the page, and a
+  second tab shows "Tally is open in another tab".
+- **Build warnings you can ignore:** PGlite's Emscripten output uses `eval` and makes a large JS chunk.
