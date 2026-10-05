@@ -74,6 +74,12 @@ export interface TransactionFilter {
 }
 
 function buildWhere(f: TransactionFilter, params: unknown[]): string {
+  const where = buildConditions(f, params);
+  return where.length ? 'WHERE ' + where.join(' AND ') : '';
+}
+
+/** SQL conditions on alias `t`; values are appended to `params` as placeholders. */
+function buildConditions(f: TransactionFilter, params: unknown[]): string[] {
   const where: string[] = [];
   const add = (sql: string, value: unknown) => {
     params.push(value);
@@ -91,8 +97,17 @@ function buildWhere(f: TransactionFilter, params: unknown[]): string {
     const p = `$${params.length}`;
     where.push(`(t.merchant ILIKE ${p} OR t.raw_name ILIKE ${p} OR coalesce(t.raw_memo, '') ILIKE ${p})`);
   }
-  return where.length ? 'WHERE ' + where.join(' AND ') : '';
+  return where;
 }
+
+/** Dashboard filter: narrows KPIs and charts to a category and/or a search term. */
+export interface DashboardFilter {
+  search?: string;
+  categoryId?: string;
+}
+
+const andConditions = (f: DashboardFilter, params: unknown[]) =>
+  buildConditions({ search: f.search, categoryId: f.categoryId }, params).map((c) => ` AND ${c}`).join('');
 
 export async function listTransactions(db: Queryable, f: TransactionFilter = {}): Promise<TransactionRow[]> {
   const params: unknown[] = [];
@@ -280,7 +295,9 @@ export interface MonthTotalRow {
 }
 
 /** Income and spending per month. Transfers are excluded; refunds reduce spending. */
-export async function monthlyTotals(db: Queryable): Promise<MonthTotalRow[]> {
+export async function monthlyTotals(db: Queryable, filter: DashboardFilter = {}): Promise<MonthTotalRow[]> {
+  const params: unknown[] = [TITHING_CATEGORY];
+  const conditions = andConditions(filter, params);
   const { rows } = await db.query<MonthTotalRow>(
     `SELECT to_char(t.posted_on, 'YYYY-MM') AS month,
            COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'income'), 0)::int AS income,
@@ -289,8 +306,9 @@ export async function monthlyTotals(db: Queryable): Promise<MonthTotalRow[]> {
            (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend' AND NOT c.is_fixed), 0))::int AS variable,
            (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend' AND t.category_id = $1), 0))::int AS tithing
     FROM transactions t JOIN categories c ON c.id = t.category_id
+    WHERE true${conditions}
     GROUP BY 1 ORDER BY 1`,
-    [TITHING_CATEGORY],
+    params,
   );
   return rows;
 }
@@ -302,17 +320,72 @@ export interface CategorySpendRow {
   total: number;
 }
 
-export async function spendingByCategory(db: Queryable, month: string): Promise<CategorySpendRow[]> {
+export async function spendingByCategory(db: Queryable, month: string, filter: DashboardFilter = {}): Promise<CategorySpendRow[]> {
+  const params: unknown[] = [`${month}-01`];
+  const conditions = andConditions(filter, params);
   const { rows } = await db.query<CategorySpendRow>(
     `SELECT c.id AS category_id, c.name, c.is_fixed, (-SUM(t.amount_cents))::int AS total
      FROM transactions t JOIN categories c ON c.id = t.category_id
-     WHERE t.flow = 'spend' AND t.posted_on >= $1::date AND t.posted_on < ($1::date + interval '1 month')
+     WHERE t.flow = 'spend' AND t.posted_on >= $1::date AND t.posted_on < ($1::date + interval '1 month')${conditions}
      GROUP BY c.id, c.name, c.is_fixed
      HAVING SUM(t.amount_cents) < 0
      ORDER BY total DESC`,
-    [`${month}-01`],
+    params,
   );
   return rows;
+}
+
+export interface MerchantSpendRow {
+  merchant: string;
+  count: number;
+  total: number;
+}
+
+/** Biggest merchants by spending for a filter, optionally within one month ("YYYY-MM"). */
+export async function topMerchants(db: Queryable, filter: DashboardFilter, month?: string, limit = 5): Promise<MerchantSpendRow[]> {
+  const params: unknown[] = [];
+  const conditions = andConditions(filter, params);
+  let monthSql = '';
+  if (month) {
+    params.push(`${month}-01`);
+    monthSql = ` AND t.posted_on >= $${params.length}::date AND t.posted_on < ($${params.length}::date + interval '1 month')`;
+  }
+  params.push(limit);
+  const { rows } = await db.query<MerchantSpendRow>(
+    `SELECT t.merchant, COUNT(*)::int AS count, (-SUM(t.amount_cents))::int AS total
+     FROM transactions t
+     WHERE t.flow = 'spend'${conditions}${monthSql}
+     GROUP BY t.merchant
+     HAVING SUM(t.amount_cents) < 0
+     ORDER BY total DESC, t.merchant
+     LIMIT $${params.length}`,
+    params,
+  );
+  return rows;
+}
+
+export interface FilterSummary {
+  spent: number;
+  purchases: number;
+  income: number;
+  first: string | null;
+  last: string | null;
+}
+
+/** All-time totals for a dashboard filter (transfers excluded; refunds reduce `spent`). */
+export async function filterSummary(db: Queryable, filter: DashboardFilter): Promise<FilterSummary> {
+  const params: unknown[] = [];
+  const conditions = andConditions(filter, params);
+  const { rows } = await db.query<FilterSummary>(
+    `SELECT (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend'), 0))::int AS spent,
+            COUNT(*) FILTER (WHERE t.flow = 'spend' AND t.amount_cents < 0)::int AS purchases,
+            COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'income'), 0)::int AS income,
+            MIN(t.posted_on)::text AS first, MAX(t.posted_on)::text AS last
+     FROM transactions t
+     WHERE t.flow <> 'transfer'${conditions}`,
+    params,
+  );
+  return rows[0] ?? { spent: 0, purchases: 0, income: 0, first: null, last: null };
 }
 
 export interface BalanceInputs {

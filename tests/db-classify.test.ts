@@ -5,6 +5,7 @@ import { reclassifyAll } from '../src/db/reclassify';
 import {
   balanceInputs,
   deleteRule,
+  filterSummary,
   listRules,
   listSpendCharges,
   listTransactions,
@@ -13,6 +14,7 @@ import {
   monthlyTotals,
   setTransactionCategory,
   setTransactionFlow,
+  topMerchants,
 } from '../src/db/repo';
 import { balanceSeries } from '../src/lib/balance';
 import { generateFakeExports } from '../src/lib/fake';
@@ -164,6 +166,31 @@ describe('Milestone 2 acceptance on demo data', () => {
         .reduce((s, t) => s + t.amount_cents, 0);
       expect(Math.abs(m.tithing - payroll / 10)).toBeLessThanOrEqual(23_500);
     }
+  });
+
+  it('dashboard filters narrow totals, summaries, and merchants to matching rows', async () => {
+    const all = await listTransactions(db, { limit: 10_000 });
+    const golf = all.filter((t) => /GOLF/i.test(t.merchant) && t.flow === 'spend');
+    expect(golf.length).toBeGreaterThan(0);
+    const golfSpent = -golf.reduce((s, t) => s + t.amount_cents, 0);
+
+    const totals = await monthlyTotals(db, { search: 'golf' });
+    expect(totals.reduce((s, m) => s + m.spending, 0)).toBe(golfSpent);
+    expect(totals.every((m) => m.income === 0)).toBe(true);
+
+    const summary = await filterSummary(db, { search: 'GoLf' });
+    expect(summary).toMatchObject({ spent: golfSpent, purchases: golf.length, income: 0 });
+
+    const merchants = await topMerchants(db, { search: 'golf' });
+    expect(merchants.map((m) => m.merchant).sort()).toEqual([...new Set(golf.map((t) => t.merchant))].sort());
+
+    const groceries = await topMerchants(db, { categoryId: 'groceries' }, undefined, 50);
+    expect(groceries.length).toBeGreaterThan(1);
+    const groceryRows = all.filter((t) => t.category_id === 'groceries' && t.flow === 'spend');
+    expect(groceries.reduce((s, m) => s + m.total, 0)).toBe(-groceryRows.reduce((s, t) => s + t.amount_cents, 0));
+
+    const both = await filterSummary(db, { search: 'golf', categoryId: 'groceries' });
+    expect(both).toMatchObject({ spent: 0, purchases: 0, first: null });
   });
 
   it('the balance chart ends at the snapshot values', async () => {

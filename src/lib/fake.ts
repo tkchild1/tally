@@ -114,6 +114,8 @@ const ENTERTAINMENT: Merchant[] = [
   { name: 'LANES BOWLING OREM UT', min: 1800, max: 4500 },
   { name: 'CINEMARK THEATRES Provo UT', min: 1200, max: 3200 },
   { name: 'STEAMGAMES.COM 425-555-0199 WA', min: 999, max: 5999 },
+  { name: 'TOPGOLF SALT LAKE CITY UT', min: 3500, max: 9000 },
+  { name: 'CANYON VIEW GOLF CLUB OREM UT', min: 2500, max: 6500 },
 ];
 
 function generateLedgers(seed: number, ledgerStart: ISODate, endDate: ISODate) {

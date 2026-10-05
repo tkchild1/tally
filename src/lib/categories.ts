@@ -90,7 +90,7 @@ export const DEFAULT_RULES: readonly DefaultRule[] = [
   {
     flow: 'spend',
     categoryId: 'entertainment',
-    pattern: /BOWL|CINEMA|CINEMARK|MEGAPLEX|THEATRE|THEATER|STEAM|NINTENDO|PLAYSTATION|XBOX|TICKETMASTER/,
+    pattern: /GOLF|BOWL|CINEMA|CINEMARK|MEGAPLEX|THEATRE|THEATER|STEAM|NINTENDO|PLAYSTATION|XBOX|TICKETMASTER/,
   },
   { flow: 'spend', categoryId: 'health', pattern: /PHARMACY|\bCVS\b|WALGREENS|DENTAL|CLINIC|HOSPITAL|MEDICAL|DOCTOR|OPTOMETR/ },
   { flow: 'spend', categoryId: 'education', pattern: /TUITION|UNIVERSITY|COLLEGE|BOOKSTORE|COURSERA|UDEMY/ },
