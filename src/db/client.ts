@@ -1,4 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
+import { reclassifyAll } from './reclassify';
 import { migrate } from './schema';
 
 /**
@@ -28,9 +29,15 @@ export async function openDb(dataDir?: string): Promise<Db> {
 
 let browserDb: Promise<Db> | null = null;
 
-/** The app's persistent database (IndexedDB), opened once per page. */
+/**
+ * The app's persistent database (IndexedDB), opened once per page. Classification re-runs
+ * on open so improved default rules apply to data imported by older versions.
+ */
 export function getBrowserDb(): Promise<Db> {
-  browserDb ??= openDb(BROWSER_DATA_DIR);
+  browserDb ??= openDb(BROWSER_DATA_DIR).then(async (db) => {
+    await reclassifyAll(db);
+    return db;
+  });
   return browserDb;
 }
 
