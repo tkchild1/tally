@@ -1,21 +1,49 @@
-import { useState } from 'react';
-import { countTransactions, listAccounts, listTransactions, type TransactionRow } from '../../db/repo';
+import { useState, type ReactNode } from 'react';
+import {
+  countTransactions,
+  listAccounts,
+  listCategories,
+  listMonths,
+  listTransactions,
+  type TransactionFilter,
+  type TransactionRow,
+} from '../../db/repo';
+import type { Flow } from '../../lib/categories';
 import { prettyMerchant } from '../../lib/merchant';
 import { Money } from '../components/Money';
-import { formatDateShort, plural } from '../format';
+import { TransferHintBanners } from '../components/StatusBanners';
+import { TransactionSheet } from '../components/TransactionSheet';
+import { formatDateShort, formatMonth, plural } from '../format';
 import { useQuery } from '../hooks';
 
 const PAGE_SIZE = 200;
 
 export function TransactionsPage() {
+  const [month, setMonth] = useState('');
   const [accountId, setAccountId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [flow, setFlow] = useState<Flow | ''>('');
+  const [search, setSearch] = useState('');
   const [limit, setLimit] = useState(PAGE_SIZE);
-  const accounts = useQuery((db) => listAccounts(db), []);
-  const filter = accountId ? { accountId } : {};
-  const total = useQuery((db) => countTransactions(db, filter), [accountId]);
-  const txns = useQuery((db) => listTransactions(db, { ...filter, limit }), [accountId, limit]);
+  const [selected, setSelected] = useState<TransactionRow | null>(null);
 
-  if (total.data === 0 && !accountId) {
+  const accounts = useQuery((db) => listAccounts(db), []);
+  const categories = useQuery((db) => listCategories(db), []);
+  const months = useQuery((db) => listMonths(db), []);
+
+  const filter: TransactionFilter = {
+    month: month || undefined,
+    accountId: accountId || undefined,
+    categoryId: categoryId || undefined,
+    flow: flow || undefined,
+    search: search || undefined,
+  };
+  const deps = [month, accountId, categoryId, flow, search];
+  const total = useQuery((db) => countTransactions(db, filter), deps);
+  const txns = useQuery((db) => listTransactions(db, { ...filter, limit }), [...deps, limit]);
+  const resetPaging = () => setLimit(PAGE_SIZE);
+
+  if (months.data?.length === 0) {
     return (
       <div className="page">
         <h1>Transactions</h1>
@@ -29,53 +57,114 @@ export function TransactionsPage() {
   return (
     <div className="page">
       <h1>Transactions</h1>
+      <TransferHintBanners />
+
       <div className="filters">
-        <label>
-          <span className="visually-hidden">Account</span>
-          <select
-            value={accountId}
-            onChange={(e) => {
-              setAccountId(e.target.value);
-              setLimit(PAGE_SIZE);
-            }}
-          >
-            <option value="">All accounts</option>
-            {accounts.data?.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.display_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {total.data !== undefined && <span className="muted small">{plural(total.data, 'transaction')}</span>}
+        <input
+          type="search"
+          placeholder="Search merchant or description"
+          aria-label="Search"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            resetPaging();
+          }}
+        />
+        <Select label="Month" value={month} onChange={(v) => (setMonth(v), resetPaging())}>
+          <option value="">All months</option>
+          {months.data?.map((m) => (
+            <option key={m} value={m}>
+              {formatMonth(m)}
+            </option>
+          ))}
+        </Select>
+        <Select label="Account" value={accountId} onChange={(v) => (setAccountId(v), resetPaging())}>
+          <option value="">All accounts</option>
+          {accounts.data?.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.display_name}
+            </option>
+          ))}
+        </Select>
+        <Select label="Category" value={categoryId} onChange={(v) => (setCategoryId(v), resetPaging())}>
+          <option value="">All categories</option>
+          {categories.data?.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </Select>
+        <Select label="Type" value={flow} onChange={(v) => (setFlow(v as Flow | ''), resetPaging())}>
+          <option value="">All types</option>
+          <option value="spend">Spending</option>
+          <option value="income">Income</option>
+          <option value="transfer">Transfers</option>
+        </Select>
       </div>
+      {total.data !== undefined && <p className="muted small">{plural(total.data, 'transaction')}</p>}
 
       {txns.error && <p role="alert">Could not load transactions.</p>}
-      <ul className="txn-list">
-        {txns.data?.map((t) => <TxnRow key={t.id} t={t} showAccount={!accountId} />)}
-      </ul>
+      {txns.data && txns.data.length > 0 && (
+        <ul className="txn-list">
+          {txns.data.map((t) => (
+            <TxnRow key={t.id} t={t} showAccount={!accountId} onOpen={() => setSelected(t)} />
+          ))}
+        </ul>
+      )}
+      {txns.data?.length === 0 && <p className="muted">No transactions match these filters.</p>}
 
       {txns.data && total.data !== undefined && txns.data.length < total.data && (
         <button type="button" className="btn btn-secondary btn-block" onClick={() => setLimit((l) => l + PAGE_SIZE)}>
           Load more
         </button>
       )}
+
+      {selected && <TransactionSheet txn={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
 
-function TxnRow({ t, showAccount }: { t: TransactionRow; showAccount: boolean }) {
+function Select({
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  children: ReactNode;
+}) {
   return (
-    <li className="txn">
-      <span className="txn-date">{formatDateShort(t.posted_on)}</span>
-      <span className="txn-main">
-        <span className="txn-merchant">{prettyMerchant(t.merchant)}</span>
-        <span className="txn-meta">
-          <span className="chip">{t.category_name}</span>
-          {showAccount && <span className="muted small">{t.account_name}</span>}
+    <label>
+      <span className="visually-hidden">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function TxnRow({ t, showAccount, onOpen }: { t: TransactionRow; showAccount: boolean; onOpen: () => void }) {
+  const isTransfer = t.flow === 'transfer';
+  return (
+    <li className={`txn ${isTransfer ? 'txn-transfer' : ''}`}>
+      <button type="button" className="txn-button" onClick={onOpen}>
+        <span className="txn-date">{formatDateShort(t.posted_on)}</span>
+        <span className="txn-main">
+          <span className="txn-merchant">{prettyMerchant(t.merchant)}</span>
+          <span className="txn-meta">
+            {isTransfer ? <span className="chip chip-transfer">Transfer</span> : <span className="chip">{t.category_name}</span>}
+            {t.transfer_hint && (
+              <span className="chip chip-hint" title={`References account ending in ${t.transfer_hint}`}>
+                ? transfer
+              </span>
+            )}
+            {showAccount && <span className="muted small">{t.account_name}</span>}
+          </span>
         </span>
-      </span>
-      <Money cents={t.amount_cents} className="txn-amount" />
+        <Money cents={t.amount_cents} className="txn-amount" />
+      </button>
     </li>
   );
 }
