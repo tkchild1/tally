@@ -39,7 +39,14 @@ export function getBrowserDb(): Promise<Db> {
  * Holds an exclusive Web Lock for the life of the page. Resolves false if another tab
  * already has Tally open. Browsers without Web Locks are allowed through.
  */
+let tabLock: Promise<boolean> | null = null;
+
 export function acquireTabLock(): Promise<boolean> {
+  tabLock ??= requestTabLock();
+  return tabLock;
+}
+
+function requestTabLock(): Promise<boolean> {
   if (typeof navigator === 'undefined' || !navigator.locks) return Promise.resolve(true);
   return new Promise((resolve) => {
     void navigator.locks.request('tally-db', { ifAvailable: true }, (lock) => {
