@@ -87,9 +87,15 @@ export function SubscriptionsPage() {
 function SubRow({ sub, categoryName }: { sub: Subscription; categoryName: string }) {
   return (
     <li className="sub">
-      <div className="sub-main">
-        <div className="sub-title">
-          <strong>{prettyMerchant(sub.merchant)}</strong>
+      <div className="sub-head">
+        <strong className="sub-name">{prettyMerchant(sub.merchant)}</strong>
+        <span className="sub-price">
+          <Money cents={sub.monthlyCents} className="money-neutral" />
+          <span className="muted small">/mo</span>
+        </span>
+      </div>
+      {(sub.priceChange || sub.confirmed) && (
+        <div className="sub-chips">
           {sub.priceChange && (
             <span className="chip chip-hint">
               Price {sub.priceChange.latestCents > sub.priceChange.previousCents ? 'up' : 'down'} from{' '}
@@ -98,24 +104,23 @@ function SubRow({ sub, categoryName }: { sub: Subscription; categoryName: string
           )}
           {sub.confirmed && <span className="chip">Confirmed</span>}
         </div>
-        <div className="muted small">
-          {CADENCE_LABEL[sub.cadence]} · <Money cents={sub.typicalCents} className="money-neutral" /> · {categoryName} ·{' '}
-          {plural(sub.charges, 'charge')}
-        </div>
-        <div className="muted small">
-          Last {formatDate(sub.lastCharged)}
-          {sub.active && <> · next about {formatDate(sub.nextExpected)}</>}
-        </div>
+      )}
+      <div className="muted small">
+        {CADENCE_LABEL[sub.cadence]}
+        {sub.cadence !== 'monthly' && (
+          <>
+            , <Money cents={sub.currentCents} className="money-neutral" /> each
+          </>
+        )}{' '}
+        · {categoryName} · {plural(sub.charges, 'charge')}
       </div>
-      <div className="sub-side">
-        <span className="small">
-          <Money cents={sub.monthlyCents} className="money-neutral" />
-          /mo
-        </span>
-        <div className="sub-actions">
-          {!sub.confirmed && <FlagButton merchant={sub.merchant} state="confirmed" label="Confirm" />}
-          <FlagButton merchant={sub.merchant} state="dismissed" label="Dismiss" />
-        </div>
+      <div className="muted small">
+        {sub.active ? <>Next about {formatDate(sub.nextExpected)} · last </> : 'Last '}
+        {formatDate(sub.lastCharged)}
+      </div>
+      <div className="sub-actions">
+        {!sub.confirmed && <FlagButton merchant={sub.merchant} state="confirmed" label="Confirm" />}
+        <FlagButton merchant={sub.merchant} state="dismissed" label="Dismiss" />
       </div>
     </li>
   );

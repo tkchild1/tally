@@ -19,6 +19,7 @@ import { BudgetBar } from '../components/BudgetBar';
 import { TITHING_RATE_BP, tithingSummary, type TithingTotals } from '../../lib/tithing';
 import { Banner } from '../components/Banner';
 import { Card } from '../components/Card';
+import { CollapsibleCard } from '../components/CollapsibleCard';
 import { BalanceChart, CategoryChart, IncomeSpendingChart, MonthlySpendChart } from '../components/Charts';
 import { Money } from '../components/Money';
 import { BackupReminderBanner, CoverageBanners, TransferHintBanners } from '../components/StatusBanners';
@@ -122,25 +123,25 @@ export function DashboardPage() {
       {!filtered && <TithingCard month={month} />}
       {!filtered && <AccountsCard />}
 
-      <Card title={`Monthly spending, ${filterLabel}`}>
+      <CollapsibleCard id="monthly-spending" title={`Monthly spending, ${filterLabel}`}>
         <MonthlySpendSection filter={filter} month={month} label={filterLabel} />
-      </Card>
+      </CollapsibleCard>
       {filter.categoryId ? (
-        <Card title={`Top merchants, ${formatMonth(month)}`}>
+        <CollapsibleCard id="top-merchants" title={`Top merchants, ${formatMonth(month)}`}>
           <MerchantList filter={filter} month={month} />
-        </Card>
+        </CollapsibleCard>
       ) : (
-        <Card title={`Spending by category, ${formatMonth(month)}`}>
+        <CollapsibleCard id="by-category" title={`Spending by category, ${formatMonth(month)}`}>
           <CategorySection month={month} filter={filter} />
-        </Card>
+        </CollapsibleCard>
       )}
-      <Card title="Income vs spending">
+      <CollapsibleCard id="income-vs-spending" title="Income vs spending" defaultOpen={false}>
         <TrendSection filter={filter} />
-      </Card>
+      </CollapsibleCard>
       {!filtered && (
-        <Card title="Balance over time">
+        <CollapsibleCard id="balance" title="Balance over time" defaultOpen={false}>
           <BalanceSection />
-        </Card>
+        </CollapsibleCard>
       )}
     </div>
   );
@@ -276,21 +277,23 @@ function MonthSummary({ month, filter }: { month: string; filter: DashboardFilte
   const t = totals.data.find((x) => x.month === month) ?? { month, income: 0, spending: 0, fixed: 0, variable: 0, tithing: 0 };
   const net = t.income - t.spending;
   const fixedShare = t.spending > 0 ? Math.round((Math.max(0, t.fixed) / t.spending) * 100) : 0;
+  const inProgress = month === todayISO().slice(0, 7);
+  const noIncomeYet = inProgress && t.income === 0 && !filter.search && !filter.categoryId;
 
   return (
     <div className="kpis">
       <div className="kpi">
         <span className="kpi-label">Income</span>
         <Money cents={t.income} className="kpi-value" />
+        {noIncomeYet && <span className="kpi-note">None yet</span>}
       </div>
       <div className="kpi">
-        <span className="kpi-label">Spending</span>
+        <span className="kpi-label">{inProgress ? 'Spent so far' : 'Spending'}</span>
         <Money cents={t.spending} className="kpi-value money-neutral" />
       </div>
       <div className="kpi">
-        <span className="kpi-label">Net</span>
-        <Money cents={net} signed className="kpi-value" />
-      </div>
+        <span className="kpi-label">{inProgress ? 'Net so far' : 'Net'}</span>
+        <Money cents={net} signed className={noIncomeYet ? 'kpi-value money-neutral' : 'kpi-value'} />      </div>
       <div className="kpi kpi-wide">
         <span className="kpi-label">Fixed vs variable spending</span>
         {t.spending <= 0 ? (
@@ -333,8 +336,11 @@ function BudgetsCard({ month }: { month: string }) {
   }
   const worst = [...s.rows].sort((a, b) => b.ratio - a.ratio).slice(0, DASHBOARD_BUDGETS);
   const pace = month === todayISO().slice(0, 7) ? s.monthElapsed : null;
+  const over = s.rows.filter((r) => r.status === 'over').length;
+  const near = s.rows.filter((r) => r.status === 'near').length;
+  const status = over ? `${over} over budget` : near ? `${near} almost at limit` : 'All on track';
   return (
-    <Card title={`Budgets, ${formatMonth(month)}`}>
+    <CollapsibleCard id="budgets" title={`Budgets, ${formatMonth(month)}`} summary={status}>
       <ul className="list">
         {worst.map((r) => (
           <li key={r.categoryId} className="budget-item">
@@ -347,7 +353,7 @@ function BudgetsCard({ month }: { month: string }) {
           {s.rows.length > worst.length ? `All ${s.rows.length} budgets` : 'Manage budgets'}
         </a>
       </p>
-    </Card>
+    </CollapsibleCard>
   );
 }
 
@@ -359,7 +365,16 @@ function TithingCard({ month }: { month: string }) {
     month,
   );
   return (
-    <Card title={`Tithing (${TITHING_RATE_BP / 100}% of income)`}>
+    <CollapsibleCard
+      id="tithing"
+      title={`Tithing (${TITHING_RATE_BP / 100}% of income)`}
+      summary={
+        <>
+          <Money cents={Math.abs(s.month.remaining)} className="money-neutral" />{' '}
+          {s.month.remaining >= 0 ? 'still to pay' : 'paid ahead'} this month
+        </>
+      }
+    >
       <div className="tithing">
         <TithingColumn label={formatMonth(month)} t={s.month} />
         <TithingColumn label={`${month.slice(0, 4)} to date`} t={s.yearToDate} />
@@ -367,7 +382,7 @@ function TithingCard({ month }: { month: string }) {
       <p className="muted small">
         Based on income deposited to your accounts. Payments categorized as Tithing count as paid.
       </p>
-    </Card>
+    </CollapsibleCard>
   );
 }
 
@@ -408,7 +423,15 @@ function AccountsCard() {
   const card = sum((k) => k === 'credit_card');
 
   return (
-    <Card title="Accounts">
+    <CollapsibleCard
+      id="accounts"
+      title="Accounts"
+      summary={
+        <>
+          Net after card <Money cents={cash + card} className="money-neutral" />
+        </>
+      }
+    >
       <ul className="list">
         {accounts.data.map((a) => (
           <li key={a.id} className="list-row">
@@ -440,7 +463,7 @@ function AccountsCard() {
           </dd>
         </div>
       </dl>
-    </Card>
+    </CollapsibleCard>
   );
 }
 

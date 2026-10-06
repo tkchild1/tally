@@ -149,7 +149,6 @@ function TxnRow({ t, showAccount, onOpen }: { t: TransactionRow; showAccount: bo
   return (
     <li className={`txn ${isTransfer ? 'txn-transfer' : ''}`}>
       <button type="button" className="txn-button" onClick={onOpen}>
-        <span className="txn-date">{formatDateShort(t.posted_on)}</span>
         <span className="txn-main">
           <span className="txn-merchant">{prettyMerchant(t.merchant)}</span>
           <span className="txn-meta">
@@ -159,10 +158,13 @@ function TxnRow({ t, showAccount, onOpen }: { t: TransactionRow; showAccount: bo
                 ? transfer
               </span>
             )}
-            {showAccount && <span className="muted small">{t.account_name}</span>}
+            {showAccount && <span className="txn-account">{t.account_name}</span>}
           </span>
         </span>
-        <Money cents={t.amount_cents} className="txn-amount" />
+        <span className="txn-side">
+          <Money cents={t.amount_cents} className="txn-amount" />
+          <span className="txn-date">{formatDateShort(t.posted_on)}</span>
+        </span>
       </button>
     </li>
   );
