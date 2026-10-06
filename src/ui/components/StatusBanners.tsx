@@ -47,12 +47,22 @@ export function TransferHintBanners() {
   );
 }
 
-/** Coverage gaps per account and a nudge when the last import is getting old. */
+function joinNames(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** Coverage gaps per account and a nudge for accounts whose newest data is getting old. */
 export function CoverageBanners({ showStale = true }: { showStale?: boolean }) {
   const coverage = useQuery((d) => loadCoverage(d), []);
   if (!coverage.data) return null;
-  const { accounts, lastImport } = coverage.data;
-  const age = lastImport ? daysBetween(lastImport, todayISO()) : null;
+  const today = todayISO();
+  const staleByEnd = new Map<string, string[]>();
+  for (const { account, ranges } of coverage.data.accounts) {
+    const end = ranges[ranges.length - 1]?.end;
+    if (end && daysBetween(end, today) >= STALE_AFTER_DAYS) staleByEnd.set(end, [...(staleByEnd.get(end) ?? []), account.display_name]);
+  }
+  const stale = [...staleByEnd].sort(([a], [b]) => (a < b ? -1 : 1));
+  const { accounts } = coverage.data;
 
   return (
     <>
@@ -64,9 +74,17 @@ export function CoverageBanners({ showStale = true }: { showStale?: boolean }) {
           </Banner>
         )),
       )}
-      {showStale && age !== null && age >= STALE_AFTER_DAYS && (
+      {showStale && stale.length > 0 && (
         <Banner>
-          Last imported {plural(age, 'day')} ago. <a href="#/import">Import this week's exports.</a>
+          {stale.map(([end, names]) => (
+            <p key={end}>
+              {joinNames(names)} {names.length === 1 ? 'has' : 'have'} nothing newer than {formatDate(end)} (
+              {plural(daysBetween(end, today), 'day')} ago).
+            </p>
+          ))}
+          <p>
+            <a href="#/import">Import newer exports</a>
+          </p>
         </Banner>
       )}
     </>
