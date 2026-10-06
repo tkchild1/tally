@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { budgetStatus, budgetSummary, monthElapsed, typicalSpending } from '../src/lib/budgets';
+import { budgetStatus, budgetSummary, monthElapsed, monthsElapsed, typicalSpending } from '../src/lib/budgets';
 
 describe('budgets', () => {
   it('status: under, near (90%+), over', () => {
@@ -48,6 +48,16 @@ describe('budgets', () => {
   it('a net refund in a category counts as zero spent', () => {
     const s = budgetSummary([{ categoryId: 'shopping', name: 'Shopping', limitCents: 10_000 }], new Map([['shopping', -2_000]]), '2026-09', '2026-09-30');
     expect(s.rows[0]).toMatchObject({ spentCents: 0, remainingCents: 10_000, status: 'under' });
+  });
+
+  it('several months multiply each monthly limit, with pace across all of them', () => {
+    const budgets = [{ categoryId: 'dining', name: 'Dining', limitCents: 20_000 }];
+    const s = budgetSummary(budgets, new Map([['dining', 70_000]]), ['2026-08', '2026-09'], '2026-09-15');
+    expect(s.rows[0]).toMatchObject({ limitCents: 40_000, spentCents: 70_000, remainingCents: -30_000, status: 'over' });
+    expect(s.totalLimitCents).toBe(40_000);
+    expect(s.monthElapsed).toBe(0.75);
+    expect(monthsElapsed(['2025-11', '2025-12'], '2026-09-15')).toBe(1);
+    expect(monthsElapsed([], '2026-09-15')).toBe(0);
   });
 
   it('typical spending averages the last 3 complete months, zeros included', () => {

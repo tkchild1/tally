@@ -27,7 +27,7 @@ export interface BudgetSummary {
   totalSpentCents: Cents;
   /** Spending in categories without a budget. */
   unbudgetedCents: Cents;
-  /** Share of the month elapsed (0..1) when `month` is the current month; 1 for past months, 0 for future ones. */
+  /** Share of the period elapsed (0..1): partial when it includes the current month, 1 when past, 0 when future. */
   monthElapsed: number;
 }
 
@@ -51,24 +51,34 @@ function daysInMonth(month: string): number {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
+/** Share of a run of months ("YYYY-MM") that has passed on `today`, each month weighted equally. */
+export function monthsElapsed(months: readonly string[], today: ISODate): number {
+  if (months.length === 0) return 0;
+  return months.reduce((s, m) => s + monthElapsed(m, today), 0) / months.length;
+}
+
 /**
- * Budget progress for one month. `spending` is spending per category for that month
- * (positive cents, refunds already netted). Rows keep the budgets' order.
+ * Budget progress for one month, or for several months (e.g. a year) by multiplying each
+ * monthly limit by the number of months. `spending` is spending per category over those
+ * months (positive cents, refunds already netted). Rows keep the budgets' order.
  */
 export function budgetSummary(
   budgets: readonly BudgetInput[],
   spending: ReadonlyMap<string, Cents>,
-  month: string,
+  months: string | readonly string[],
   today: ISODate,
 ): BudgetSummary {
+  const list = typeof months === 'string' ? [months] : months;
   const rows = budgets.map((b) => {
+    const limitCents = b.limitCents * list.length;
     const spentCents = Math.max(0, spending.get(b.categoryId) ?? 0);
     return {
       ...b,
+      limitCents,
       spentCents,
-      remainingCents: b.limitCents - spentCents,
-      ratio: b.limitCents > 0 ? spentCents / b.limitCents : spentCents > 0 ? Infinity : 0,
-      status: budgetStatus(spentCents, b.limitCents),
+      remainingCents: limitCents - spentCents,
+      ratio: limitCents > 0 ? spentCents / limitCents : spentCents > 0 ? Infinity : 0,
+      status: budgetStatus(spentCents, limitCents),
     };
   });
   const budgeted = new Set(budgets.map((b) => b.categoryId));
@@ -79,7 +89,7 @@ export function budgetSummary(
     totalLimitCents: rows.reduce((s, r) => s + r.limitCents, 0),
     totalSpentCents: rows.reduce((s, r) => s + r.spentCents, 0),
     unbudgetedCents,
-    monthElapsed: monthElapsed(month, today),
+    monthElapsed: monthsElapsed(list, today),
   };
 }
 

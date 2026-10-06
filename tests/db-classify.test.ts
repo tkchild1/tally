@@ -224,6 +224,14 @@ describe('Milestone 2 acceptance on demo data', () => {
     for (const c of dec) {
       expect(byMonth.find((r) => r.month === '2025-12' && r.categoryId === c.category_id)?.totalCents).toBe(c.total);
     }
+
+    const year = await spendingByCategory(db, '2026');
+    for (const c of year) {
+      const sum = byMonth.filter((r) => r.month.startsWith('2026-') && r.categoryId === c.category_id).reduce((s, r) => s + r.totalCents, 0);
+      expect(c.total).toBe(sum);
+    }
+    const yearMerchants = await topMerchants(db, {}, '2026', 1000);
+    expect(yearMerchants.reduce((s, m) => s + m.total, 0)).toBe(year.reduce((s, c) => s + c.total, 0));
   });
 
   it('the balance chart ends at the snapshot values', async () => {

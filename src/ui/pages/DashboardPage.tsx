@@ -12,7 +12,7 @@ import {
   type MonthTotalRow,
 } from '../../db/repo';
 import { balanceSeries } from '../../lib/balance';
-import { todayISO } from '../../lib/dates';
+import { isYearPeriod, monthInPeriod, todayISO } from '../../lib/dates';
 import { prettyMerchant } from '../../lib/merchant';
 import { loadBudgetSummary } from '../budgets';
 import { BudgetBar } from '../components/BudgetBar';
@@ -24,7 +24,7 @@ import { BalanceChart, CategoryChart, IncomeSpendingChart, MonthlySpendChart } f
 import { Money } from '../components/Money';
 import { BackupReminderBanner, CoverageBanners, TransferHintBanners, UncategorizedBanner } from '../components/StatusBanners';
 import { loadDemoData } from '../demo';
-import { formatDate, formatMonth, plural } from '../format';
+import { formatDate, formatMonth, formatPeriod, plural } from '../format';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
 
 const CHART_MONTHS = 12;
@@ -44,7 +44,9 @@ export function DashboardPage() {
 
   if (months.data === undefined) return <div className="page" />;
   if (months.data.length === 0) return <EmptyDashboard />;
-  const month = picked && months.data.includes(picked) ? picked : months.data[0]!;
+  const monthList = months.data;
+  const years = [...new Set(monthList.map((m) => m.slice(0, 4)))];
+  const period = picked && (monthList.includes(picked) || years.includes(picked)) ? picked : monthList[0]!;
   const filter: DashboardFilter = { search: search || undefined, categoryId: categoryId || undefined };
   const filtered = Boolean(filter.search || filter.categoryId);
   const categoryName = categories.data?.find((c) => c.id === categoryId)?.name;
@@ -55,12 +57,19 @@ export function DashboardPage() {
       <div className="page-head">
         <h1>Dashboard</h1>
         <label>
-          <span className="visually-hidden">Month</span>
-          <select value={month} onChange={(e) => setPicked(e.target.value)}>
-            {months.data.map((m) => (
-              <option key={m} value={m}>
-                {formatMonth(m)}
-              </option>
+          <span className="visually-hidden">Month or year</span>
+          <select value={period} onChange={(e) => setPicked(e.target.value)}>
+            {years.map((y) => (
+              <optgroup key={y} label={y}>
+                <option value={y}>All of {y}</option>
+                {monthList
+                  .filter((m) => monthInPeriod(m, y))
+                  .map((m) => (
+                    <option key={m} value={m}>
+                      {formatMonth(m)}
+                    </option>
+                  ))}
+              </optgroup>
             ))}
           </select>
         </label>
@@ -118,21 +127,21 @@ export function DashboardPage() {
         </>
       )}
 
-      <MonthSummary month={month} filter={filter} />
+      <PeriodSummary period={period} filter={filter} />
       {filtered && <FilterSummaryCard filter={filter} label={filterLabel} monthCount={months.data.length} />}
-      {!filtered && <BudgetsCard month={month} />}
+      {!filtered && <BudgetsCard period={period} />}
       {!filtered && <AccountsCard />}
 
       <CollapsibleCard id="monthly-spending" title={`Monthly spending, ${filterLabel}`}>
-        <MonthlySpendSection filter={filter} month={month} label={filterLabel} />
+        <MonthlySpendSection filter={filter} period={period} label={filterLabel} />
       </CollapsibleCard>
       {filter.categoryId ? (
-        <CollapsibleCard id="top-merchants" title={`Top merchants, ${formatMonth(month)}`}>
-          <MerchantList filter={filter} month={month} />
+        <CollapsibleCard id="top-merchants" title={`Top merchants, ${formatPeriod(period)}`}>
+          <MerchantList filter={filter} period={period} />
         </CollapsibleCard>
       ) : (
-        <CollapsibleCard id="by-category" title={`Spending by category, ${formatMonth(month)}`}>
-          <CategorySection month={month} filter={filter} />
+        <CollapsibleCard id="by-category" title={`Spending by category, ${formatPeriod(period)}`}>
+          <CategorySection period={period} filter={filter} />
         </CollapsibleCard>
       )}
       <CollapsibleCard id="income-vs-spending" title="Income vs spending" defaultOpen={false}>
@@ -143,7 +152,7 @@ export function DashboardPage() {
           <BalanceSection />
         </CollapsibleCard>
       )}
-      {!filtered && <TithingCard month={month} />}
+      {!filtered && <TithingCard period={period} />}
     </div>
   );
 }
@@ -164,17 +173,23 @@ function useFilteredMonths(filter: DashboardFilter): MonthTotalRow[] | undefined
   return q.data;
 }
 
-function MonthlySpendSection({ filter, month, label }: { filter: DashboardFilter; month: string; label: string }) {
-  const rows = useFilteredMonths(filter);
-  if (!rows) return null;
-  if (rows.every((t) => t.spending <= 0)) return <p className="muted">No spending matches this filter.</p>;
-  return <MonthlySpendChart data={rows.slice(-CHART_MONTHS)} selected={month} label={label} />;
+/** "this month" or "in 2026", for sentences like "No spending this month." */
+function periodPhrase(period: string): string {
+  return isYearPeriod(period) ? `in ${period}` : 'this month';
 }
 
-function MerchantList({ filter, month }: { filter: DashboardFilter; month?: string }) {
-  const rows = useQuery((d) => topMerchants(d, filter, month), [filter.search, filter.categoryId, month]);
+function MonthlySpendSection({ filter, period, label }: { filter: DashboardFilter; period: string; label: string }) {
+  const rows = useFilteredMonths(filter);
+  if (!rows) return null;
+  const shown = isYearPeriod(period) ? rows.filter((r) => monthInPeriod(r.month, period)) : rows.slice(-CHART_MONTHS);
+  if (shown.every((t) => t.spending <= 0)) return <p className="muted">No spending matches this filter.</p>;
+  return <MonthlySpendChart data={shown} selected={period} label={label} />;
+}
+
+function MerchantList({ filter, period }: { filter: DashboardFilter; period?: string }) {
+  const rows = useQuery((d) => topMerchants(d, filter, period), [filter.search, filter.categoryId, period]);
   if (!rows.data) return null;
-  if (rows.data.length === 0) return <p className="muted">No spending matches{month ? ' this month' : ''}.</p>;
+  if (rows.data.length === 0) return <p className="muted">No spending matches{period ? ` ${periodPhrase(period)}` : ''}.</p>;
   return (
     <ul className="list">
       {rows.data.map((m) => (
@@ -272,13 +287,20 @@ function EmptyDashboard() {
   );
 }
 
-function MonthSummary({ month, filter }: { month: string; filter: DashboardFilter }) {
+function PeriodSummary({ period, filter }: { period: string; filter: DashboardFilter }) {
   const totals = useQuery((d) => monthlyTotals(d, filter), [filter.search, filter.categoryId]);
   if (!totals.data) return null;
-  const t = totals.data.find((x) => x.month === month) ?? { month, income: 0, spending: 0, fixed: 0, variable: 0, tithing: 0 };
+  const t = { income: 0, spending: 0, fixed: 0, variable: 0 };
+  for (const r of totals.data) {
+    if (!monthInPeriod(r.month, period)) continue;
+    t.income += r.income;
+    t.spending += r.spending;
+    t.fixed += r.fixed;
+    t.variable += r.variable;
+  }
   const net = t.income - t.spending;
   const fixedShare = t.spending > 0 ? Math.round((Math.max(0, t.fixed) / t.spending) * 100) : 0;
-  const inProgress = month === todayISO().slice(0, 7);
+  const inProgress = monthInPeriod(todayISO().slice(0, 7), period);
   const noIncomeYet = inProgress && t.income === 0 && !filter.search && !filter.categoryId;
 
   return (
@@ -298,7 +320,7 @@ function MonthSummary({ month, filter }: { month: string; filter: DashboardFilte
       <div className="kpi kpi-wide">
         <span className="kpi-label">Fixed vs variable spending</span>
         {t.spending <= 0 ? (
-          <p className="muted small">No spending this month.</p>
+          <p className="muted small">No spending {periodPhrase(period)}.</p>
         ) : (
           <>
             <div className="split" role="img" aria-label={`Fixed ${fixedShare} percent, variable ${100 - fixedShare} percent`}>
@@ -322,8 +344,8 @@ function MonthSummary({ month, filter }: { month: string; filter: DashboardFilte
 
 const DASHBOARD_BUDGETS = 4;
 
-function BudgetsCard({ month }: { month: string }) {
-  const summary = useQuery((d) => loadBudgetSummary(d, month), [month]);
+function BudgetsCard({ period }: { period: string }) {
+  const summary = useQuery((d) => loadBudgetSummary(d, period), [period]);
   const s = summary.data;
   if (!s) return null;
   if (s.rows.length === 0) {
@@ -336,19 +358,21 @@ function BudgetsCard({ month }: { month: string }) {
     );
   }
   const worst = [...s.rows].sort((a, b) => b.ratio - a.ratio).slice(0, DASHBOARD_BUDGETS);
-  const pace = month === todayISO().slice(0, 7) ? s.monthElapsed : null;
+  const pace = s.monthElapsed > 0 && s.monthElapsed < 1 ? s.monthElapsed : null;
+  const year = isYearPeriod(period);
   const over = s.rows.filter((r) => r.status === 'over').length;
   const near = s.rows.filter((r) => r.status === 'near').length;
   const status = over ? `${over} over budget` : near ? `${near} almost at limit` : 'All on track';
   return (
-    <CollapsibleCard id="budgets" title={`Budgets, ${formatMonth(month)}`} summary={status}>
+    <CollapsibleCard id="budgets" title={`Budgets, ${formatPeriod(period)}`} summary={status}>
       <ul className="list">
         {worst.map((r) => (
           <li key={r.categoryId} className="budget-item">
-            <BudgetBar row={r} pace={pace} />
+            <BudgetBar row={r} pace={pace} unit={year ? 'year' : 'month'} />
           </li>
         ))}
       </ul>
+      {year && <p className="muted small">Monthly limits × the months of {period} that have data.</p>}
       <p className="small">
         <a href="#/budgets">
           {s.rows.length > worst.length ? `All ${s.rows.length} budgets` : 'Manage budgets'}
@@ -358,27 +382,31 @@ function BudgetsCard({ month }: { month: string }) {
   );
 }
 
-function TithingCard({ month }: { month: string }) {
+function TithingCard({ period }: { period: string }) {
   const totals = useQuery((d) => monthlyTotals(d), []);
   if (!totals.data) return null;
+  const year = isYearPeriod(period);
   const s = tithingSummary(
     totals.data.map((t) => ({ month: t.month, income: t.income, tithingPaid: t.tithing })),
-    month,
+    year ? `${period}-12` : period,
   );
+  const headline = year ? s.yearToDate : s.month;
+  const y = period.slice(0, 4);
+  const yearLabel = !year || todayISO().startsWith(y) ? `${y} to date` : y;
   return (
     <CollapsibleCard
       id="tithing"
       title={`Tithing (${TITHING_RATE_BP / 100}% of income)`}
       summary={
         <>
-          <Money cents={Math.abs(s.month.remaining)} className="money-neutral" />{' '}
-          {s.month.remaining >= 0 ? 'still to pay' : 'paid ahead'} this month
+          <Money cents={Math.abs(headline.remaining)} className="money-neutral" />{' '}
+          {headline.remaining >= 0 ? 'still to pay' : 'paid ahead'} {periodPhrase(period)}
         </>
       }
     >
       <ul className="list">
-        <TithingRow label={formatMonth(month)} t={s.month} />
-        <TithingRow label={`${month.slice(0, 4)} to date`} t={s.yearToDate} />
+        {!year && <TithingRow label={formatMonth(period)} t={s.month} />}
+        <TithingRow label={yearLabel} t={s.yearToDate} />
       </ul>
       <p className="muted small">Payments in the Tithing category count as paid.</p>
     </CollapsibleCard>
@@ -475,10 +503,10 @@ function AccountsCard() {
   );
 }
 
-function CategorySection({ month, filter }: { month: string; filter: DashboardFilter }) {
-  const rows = useQuery((d) => spendingByCategory(d, month, filter), [month, filter.search, filter.categoryId]);
+function CategorySection({ period, filter }: { period: string; filter: DashboardFilter }) {
+  const rows = useQuery((d) => spendingByCategory(d, period, filter), [period, filter.search, filter.categoryId]);
   if (!rows.data) return null;
-  if (rows.data.length === 0) return <p className="muted">No spending this month.</p>;
+  if (rows.data.length === 0) return <p className="muted">No spending {periodPhrase(period)}.</p>;
   return <CategoryChart data={rows.data} />;
 }
 

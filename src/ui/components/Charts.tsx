@@ -14,6 +14,7 @@ import {
   LabelList,
 } from 'recharts';
 import type { BalancePoint } from '../../lib/balance';
+import { isYearPeriod, monthInPeriod } from '../../lib/dates';
 import { formatCents } from '../../lib/money';
 import type { CategorySpendRow, MonthTotalRow } from '../../db/repo';
 import { formatCompactCents, formatDate, formatDateShort, formatMonth } from '../format';
@@ -78,7 +79,7 @@ export function IncomeSpendingChart({ data }: { data: MonthTotalRow[] }) {
   );
 }
 
-/** Spending per month for the current filter, the selected month highlighted, with the average as a dashed line. */
+/** Spending per month for the current filter, the selected period highlighted, with the average as a dashed line. */
 export function MonthlySpendChart({ data, selected, label }: { data: MonthTotalRow[]; selected: string; label: string }) {
   const rows = data.map((d) => ({ month: d.month, spending: d.spending, label: formatMonth(d.month, true) }));
   const average = rows.length ? Math.round(rows.reduce((s, r) => s + r.spending, 0) / rows.length) : 0;
@@ -94,14 +95,14 @@ export function MonthlySpendChart({ data, selected, label }: { data: MonthTotalR
             <ReferenceLine y={average} stroke={PALETTE.orange} strokeDasharray="6 4" />
             <Bar dataKey="spending" name="Spent" radius={[3, 3, 0, 0]} isAnimationActive={animate}>
               {rows.map((r) => (
-                <Cell key={r.month} fill={PALETTE.blue} fillOpacity={r.month === selected ? 1 : 0.45} />
+                <Cell key={r.month} fill={PALETTE.blue} fillOpacity={monthInPeriod(r.month, selected) ? 1 : 0.45} />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
       <p className="muted small">
-        Dashed line: monthly average, {formatCents(average)}. The selected month is darker.
+        Dashed line: monthly average, {formatCents(average)}.{isYearPeriod(selected) ? '' : ' The selected month is darker.'}
       </p>
       <DataTable
         caption={`Monthly spending, ${label}`}

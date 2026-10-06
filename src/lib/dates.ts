@@ -71,6 +71,25 @@ export function monthOf(d: ISODate): string {
   return d.slice(0, 7);
 }
 
+/** A period is either a month ("2026-01") or a whole calendar year ("2026"). */
+export function isYearPeriod(period: string): boolean {
+  return /^\d{4}$/.test(period);
+}
+
+/** First day of the period and the first day after it. */
+export function periodBounds(period: string): { start: ISODate; end: ISODate } {
+  if (isYearPeriod(period)) {
+    return { start: `${period}-01-01`, end: `${Number(period) + 1}-01-01` };
+  }
+  const start = `${period}-01`;
+  return { start, end: addMonths(start, 1) };
+}
+
+/** Whether a "YYYY-MM" month falls inside the period. */
+export function monthInPeriod(month: string, period: string): boolean {
+  return isYearPeriod(period) ? month.slice(0, 4) === period : month === period;
+}
+
 export function compareISO(a: ISODate, b: ISODate): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }

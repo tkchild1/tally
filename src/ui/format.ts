@@ -26,6 +26,11 @@ export function formatMonth(month: string, short = false): string {
   return short ? name : `${name} ${month.slice(0, 4)}`;
 }
 
+/** "Jan 2026" for a month, "2026" for a whole year. */
+export function formatPeriod(period: string): string {
+  return period.length === 4 ? period : formatMonth(period);
+}
+
 /** Axis labels: whole dollars, "k" above $1,000. Display only. */
 export function formatCompactCents(cents: number): string {
   const dollars = Math.round(cents / 100);

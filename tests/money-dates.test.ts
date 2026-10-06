@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { centsToDecimal, formatCents, parseAmountToCents } from '../src/lib/money';
-import { addDays, addMonths, daysBetween, isISODate, parseOfxDate, todayISO } from '../src/lib/dates';
+import { addDays, addMonths, daysBetween, isISODate, isYearPeriod, monthInPeriod, parseOfxDate, periodBounds, todayISO } from '../src/lib/dates';
 
 describe('parseAmountToCents', () => {
   it.each([
@@ -59,5 +59,15 @@ describe('dates', () => {
     expect(isISODate('2026-02-29')).toBe(false);
     expect(isISODate('2028-02-29')).toBe(true);
     expect(todayISO(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
+  });
+  it('periods: a month or a whole year', () => {
+    expect(isYearPeriod('2026')).toBe(true);
+    expect(isYearPeriod('2026-03')).toBe(false);
+    expect(periodBounds('2026')).toEqual({ start: '2026-01-01', end: '2027-01-01' });
+    expect(periodBounds('2026-12')).toEqual({ start: '2026-12-01', end: '2027-01-01' });
+    expect(monthInPeriod('2026-03', '2026')).toBe(true);
+    expect(monthInPeriod('2025-12', '2026')).toBe(false);
+    expect(monthInPeriod('2026-03', '2026-03')).toBe(true);
+    expect(monthInPeriod('2026-04', '2026-03')).toBe(false);
   });
 });

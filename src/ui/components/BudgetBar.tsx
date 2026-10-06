@@ -5,9 +5,9 @@ const STATUS_LABEL = { under: 'On track', near: 'Almost at limit', over: 'Over b
 
 /**
  * One budget's progress. The bar is decorative; the text carries the same information
- * (status words, not just color). `pace` (0..1) marks how much of the month has passed.
+ * (status words, not just color). `pace` (0..1) marks how much of the period (a month or a year) has passed.
  */
-export function BudgetBar({ row, pace }: { row: BudgetProgress; pace: number | null }) {
+export function BudgetBar({ row, pace, unit = 'month' }: { row: BudgetProgress; pace: number | null; unit?: 'month' | 'year' }) {
   const fill = Math.min(1, Number.isFinite(row.ratio) ? row.ratio : 1);
   const ahead = pace !== null && pace > 0 && pace < 1 && row.status === 'under' && row.ratio > pace + 0.1;
   return (
@@ -23,7 +23,7 @@ export function BudgetBar({ row, pace }: { row: BudgetProgress; pace: number | n
       <div className="small muted">
         {formatCents(row.spentCents)} of {formatCents(row.limitCents)} ·{' '}
         {row.remainingCents >= 0 ? `${formatCents(row.remainingCents)} left` : `over by ${formatCents(-row.remainingCents)}`}
-        {ahead && ' · spending faster than the month'}
+        {ahead && ` · spending faster than the ${unit}`}
       </div>
     </div>
   );

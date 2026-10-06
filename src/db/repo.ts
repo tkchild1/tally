@@ -1,4 +1,5 @@
 import { categoryNameProblem, customCategoryId, DEFAULT_CATEGORIES, TITHING_CATEGORY, type Flow } from '../lib/categories';
+import { periodBounds } from '../lib/dates';
 import type { AccountKind } from '../lib/qfx';
 import type { MerchantFlag } from '../lib/subscriptions';
 import type { Db, Queryable } from './client';
@@ -414,13 +415,15 @@ export interface CategorySpendRow {
   total: number;
 }
 
-export async function spendingByCategory(db: Queryable, month: string, filter: DashboardFilter = {}): Promise<CategorySpendRow[]> {
-  const params: unknown[] = [`${month}-01`];
+/** Spending per category within a period: a month ("YYYY-MM") or a whole year ("YYYY"). */
+export async function spendingByCategory(db: Queryable, period: string, filter: DashboardFilter = {}): Promise<CategorySpendRow[]> {
+  const { start, end } = periodBounds(period);
+  const params: unknown[] = [start, end];
   const conditions = andConditions(filter, params);
   const { rows } = await db.query<CategorySpendRow>(
     `SELECT c.id AS category_id, c.name, c.is_fixed, (-SUM(t.amount_cents))::int AS total
      FROM transactions t JOIN categories c ON c.id = t.category_id
-     WHERE t.flow = 'spend' AND t.posted_on >= $1::date AND t.posted_on < ($1::date + interval '1 month')${conditions}
+     WHERE t.flow = 'spend' AND t.posted_on >= $1::date AND t.posted_on < $2::date${conditions}
      GROUP BY c.id, c.name, c.is_fixed
      HAVING SUM(t.amount_cents) < 0
      ORDER BY total DESC`,
@@ -435,20 +438,21 @@ export interface MerchantSpendRow {
   total: number;
 }
 
-/** Biggest merchants by spending for a filter, optionally within one month ("YYYY-MM"). */
-export async function topMerchants(db: Queryable, filter: DashboardFilter, month?: string, limit = 5): Promise<MerchantSpendRow[]> {
+/** Biggest merchants by spending for a filter, optionally within a period ("YYYY-MM" or "YYYY"). */
+export async function topMerchants(db: Queryable, filter: DashboardFilter, period?: string, limit = 5): Promise<MerchantSpendRow[]> {
   const params: unknown[] = [];
   const conditions = andConditions(filter, params);
-  let monthSql = '';
-  if (month) {
-    params.push(`${month}-01`);
-    monthSql = ` AND t.posted_on >= $${params.length}::date AND t.posted_on < ($${params.length}::date + interval '1 month')`;
+  let periodSql = '';
+  if (period) {
+    const { start, end } = periodBounds(period);
+    params.push(start, end);
+    periodSql = ` AND t.posted_on >= $${params.length - 1}::date AND t.posted_on < $${params.length}::date`;
   }
   params.push(limit);
   const { rows } = await db.query<MerchantSpendRow>(
     `SELECT t.merchant, COUNT(*)::int AS count, (-SUM(t.amount_cents))::int AS total
      FROM transactions t
-     WHERE t.flow = 'spend'${conditions}${monthSql}
+     WHERE t.flow = 'spend'${conditions}${periodSql}
      GROUP BY t.merchant
      HAVING SUM(t.amount_cents) < 0
      ORDER BY total DESC, t.merchant
