@@ -23,8 +23,10 @@ export interface Subscription {
   merchant: string;
   categoryId: string;
   cadence: Cadence;
-  /** Positive cents: the median charge. */
+  /** Positive cents: the median charge, used for detection. */
   typicalCents: Cents;
+  /** Positive cents: the latest charge. Monthly and yearly costs use it, so a price change shows at once. */
+  currentCents: Cents;
   monthlyCents: Cents;
   yearlyCents: Cents;
   lastCharged: ISODate;
@@ -110,8 +112,9 @@ function analyze(merchant: string, list: SubscriptionTxn[], today: ISODate, conf
     categoryId,
     cadence: spec.cadence,
     typicalCents: typical,
-    monthlyCents: Math.round((typical * spec.perYear) / 12),
-    yearlyCents: typical * spec.perYear,
+    currentCents: latestCents,
+    monthlyCents: Math.round((latestCents * spec.perYear) / 12),
+    yearlyCents: latestCents * spec.perYear,
     lastCharged,
     nextExpected: nextExpected(charges.map(([d]) => d), spec),
     charges: charges.length,

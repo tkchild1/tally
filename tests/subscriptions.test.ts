@@ -24,6 +24,7 @@ describe('detectSubscriptions', () => {
       merchant: 'NETFLIX.COM',
       cadence: 'monthly',
       typicalCents: 1549,
+      currentCents: 1549,
       monthlyCents: 1549,
       yearlyCents: 18588,
       lastCharged: '2026-01-31',
@@ -73,6 +74,16 @@ describe('detectSubscriptions', () => {
   it('flags a price change between the last two charges', () => {
     const txns = monthly('HULU', '2025-09-20', 4, [1799, 1799, 1799, 1899]);
     expect(detectSubscriptions(txns, '2026-01-01', none)[0]!.priceChange).toEqual({ previousCents: 1799, latestCents: 1899 });
+  });
+
+  it('costs a subscription at its latest price, not the median', () => {
+    const txns = monthly('HULU', '2025-09-20', 4, [1799, 1799, 1799, 1899]);
+    expect(detectSubscriptions(txns, '2026-01-01', none)[0]).toMatchObject({
+      typicalCents: 1799,
+      currentCents: 1899,
+      monthlyCents: 1899,
+      yearlyCents: 22788,
+    });
   });
 
   it('marks a subscription lapsed when the last charge is too old', () => {
