@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { acquireTabLock, getBrowserDb, type Db } from './db/client';
+import { ErrorBoundary } from './ui/components/ErrorBoundary';
 import { Tabs, type TabDef } from './ui/components/Tabs';
 import { DbContext, useHashRoute } from './ui/hooks';
 import { BudgetsPage } from './ui/pages/BudgetsPage';
@@ -66,7 +67,9 @@ export function App() {
     <DbContext.Provider value={status.db}>
       <Tabs tabs={TABS} active={active} />
       <main className="content">
-        <Page />
+        <ErrorBoundary key={active}>
+          <Page />
+        </ErrorBoundary>
       </main>
     </DbContext.Provider>
   );

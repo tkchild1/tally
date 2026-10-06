@@ -34,7 +34,7 @@ export interface QueryState<T> {
   loading: boolean;
 }
 
-/** Runs `fn(db)` whenever `deps` or the global data version change. */
+/** Runs `fn(db)` whenever `deps` or the global data version change. A failed query throws to the nearest ErrorBoundary. */
 export function useQuery<T>(fn: (db: Db) => Promise<T>, deps: readonly unknown[]): QueryState<T> {
   const db = useDb();
   const version = useDataVersion();
@@ -52,6 +52,7 @@ export function useQuery<T>(fn: (db: Db) => Promise<T>, deps: readonly unknown[]
     };
   }, [db, version, ...deps]);
 
+  if (state.error) throw state.error;
   return state;
 }
 

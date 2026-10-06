@@ -103,7 +103,6 @@ export function TransactionsPage() {
       </div>
       {total.data !== undefined && <p className="muted small">{plural(total.data, 'transaction')}</p>}
 
-      {txns.error && <p role="alert">Could not load transactions.</p>}
       {txns.data && txns.data.length > 0 && (
         <ul className="txn-list">
           {txns.data.map((t) => (
