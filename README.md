@@ -689,6 +689,10 @@ Milestone 2 added Recharts 3. Milestones 3 and 4 added no dependencies (WebCrypt
   - The "Monthly spending" chart (always shown) follows the filter, with zero-filled months and a dashed monthly average.
 
   The demo data includes two fake golf merchants so "golf" has something to find.
+- **Whole-year view (owner addition).** The month picker groups months by year, each with an "All of YYYY" option. A
+  year sums the KPIs ("so far" for the current year), the category chart and top merchants over the whole year, and the
+  Monthly spending chart shows just that year's months. Budgets multiply each monthly limit by the months of that year
+  that have data, with the pace marker spread across them. Tithing shows one row for the year.
 - **Import picker has no `accept` filter.** iOS doesn't recognize `.qfx`, so a filter greys out every file; the parser
   already rejects files that aren't OFX, with a clear message.
 - **Saving the backup file:** a normal download, plus a "Share / Save to Files" button when the browser can share files
