@@ -28,6 +28,8 @@ describe('migrations', () => {
       UPDATE categories SET name = 'Dining & coffee' WHERE id = 'dining';
       DELETE FROM categories WHERE id = 'tithing';
       ALTER TABLE categories DROP COLUMN is_custom;
+      ALTER TABLE categories DROP COLUMN is_earned;
+      DELETE FROM categories WHERE id IN ('income_transfers_in', 'income_refunds');
       UPDATE meta SET value = '1' WHERE key = 'schema_version';`);
     await migrate(db);
     const { rows } = await db.query<{ id: string; name: string }>(
@@ -36,6 +38,15 @@ describe('migrations', () => {
     expect(rows).toEqual([
       { id: 'dining', name: 'Dining' },
       { id: 'tithing', name: 'Tithing' },
+    ]);
+    const income = await db.query<{ id: string; is_earned: boolean }>(
+      `SELECT id, is_earned FROM categories WHERE kind = 'income' ORDER BY id`,
+    );
+    expect(income.rows).toEqual([
+      { id: 'income_other', is_earned: false },
+      { id: 'income_paycheck', is_earned: true },
+      { id: 'income_refunds', is_earned: false },
+      { id: 'income_transfers_in', is_earned: false },
     ]);
   });
 });

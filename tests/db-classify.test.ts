@@ -151,8 +151,8 @@ describe('Milestone 2 acceptance on demo data', () => {
         .filter((t) => t.posted_on.startsWith(m.month) && t.merchant === 'ACME CORP PAYROLL')
         .reduce((s, t) => s + t.amount_cents, 0);
       expect(payroll).toBeGreaterThanOrEqual(2 * 235_000);
-      expect(m.income - payroll).toBeGreaterThanOrEqual(0);
-      expect(m.income - payroll).toBeLessThan(1_000);
+      expect(m.earned).toBe(payroll);
+      expect(m.income).toBeGreaterThanOrEqual(m.earned);
       expect(m.spending).toBe(m.fixed + m.variable);
     }
   });

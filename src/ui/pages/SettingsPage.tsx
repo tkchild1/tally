@@ -10,6 +10,7 @@ import {
   listRules,
   renameAccount,
   renameCategory,
+  setCategoryEarned,
   setCategoryFixed,
   type AccountRow,
   type CategoryRow,
@@ -57,7 +58,8 @@ function CategoriesCard() {
     <Card title="Categories">
       <p className="muted small">
         Fixed costs (rent, insurance, subscriptions) stay about the same each month. The dashboard splits spending into fixed
-        and variable. <a href="#/review">Sort uncategorized merchants</a>
+        and variable. Earned income is pay for work; tithing is figured on earned income only.{' '}
+        <a href="#/review">Sort uncategorized merchants</a>
       </p>
       <h3 className="small muted">Spending</h3>
       <ul className="list">
@@ -160,6 +162,17 @@ function CategoryRowItem({ category }: { category: CategoryRow }) {
           <span>Fixed</span>
         </label>
       )}
+      {category.kind === 'income' && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={category.is_earned}
+            disabled={busy}
+            onChange={(e) => run(() => setCategoryEarned(db, category.id, e.target.checked))}
+          />
+          <span>Earned</span>
+        </label>
+      )}
       <button type="button" className="btn btn-secondary btn-small" onClick={() => setEditing(true)} aria-label={`Edit ${category.name}`}>
         Edit
       </button>
@@ -173,6 +186,7 @@ function AddCategoryForm() {
   const [name, setName] = useState('');
   const [kind, setKind] = useState<'expense' | 'income'>('expense');
   const [isFixed, setIsFixed] = useState(false);
+  const [isEarned, setIsEarned] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<string | null>(null);
 
@@ -180,10 +194,11 @@ function AddCategoryForm() {
     setError(null);
     setAdded(null);
     try {
-      await run(() => addCategory(db, name, kind, isFixed));
+      await run(() => addCategory(db, name, kind, isFixed, isEarned));
       setAdded(name.trim());
       setName('');
       setIsFixed(false);
+      setIsEarned(false);
     } catch (e) {
       setError(e instanceof CategoryNameError ? e.message : 'Could not add the category.');
     }
@@ -217,6 +232,12 @@ function AddCategoryForm() {
         <label className="check">
           <input type="checkbox" checked={isFixed} onChange={(e) => setIsFixed(e.target.checked)} />
           <span>Fixed cost (about the same every month)</span>
+        </label>
+      )}
+      {kind === 'income' && (
+        <label className="check">
+          <input type="checkbox" checked={isEarned} onChange={(e) => setIsEarned(e.target.checked)} />
+          <span>Earned income (pay for work; counts toward tithing)</span>
         </label>
       )}
       {error && <p role="alert" className="small error-text">{error}</p>}

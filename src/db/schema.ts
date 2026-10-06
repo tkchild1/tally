@@ -85,6 +85,10 @@ export const MIGRATIONS: readonly string[] = [
   /* 3 */ `
   ALTER TABLE categories ADD COLUMN is_custom boolean NOT NULL DEFAULT false;
   `,
+  /* 4 */ `
+  ALTER TABLE categories ADD COLUMN is_earned boolean NOT NULL DEFAULT false;
+  UPDATE categories SET is_earned = true WHERE id = 'income_paycheck';
+  `,
 ];
 
 export async function getSchemaVersion(db: Queryable): Promise<number> {
@@ -109,12 +113,12 @@ export async function migrate(db: Db): Promise<void> {
   await seedCategories(db);
 }
 
-/** Insert missing default categories; existing rows (and the user's fixed/variable choice) are kept. */
+/** Insert missing default categories; existing rows (and the user's fixed/earned choices) are kept. */
 export async function seedCategories(db: Queryable): Promise<void> {
   for (const c of DEFAULT_CATEGORIES) {
     await db.query(
-      `INSERT INTO categories (id, name, kind, is_fixed) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING`,
-      [c.id, c.name, c.kind, c.isFixed],
+      `INSERT INTO categories (id, name, kind, is_fixed, is_earned) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (id) DO NOTHING`,
+      [c.id, c.name, c.kind, c.isFixed, c.isEarned ?? false],
     );
   }
 }

@@ -803,7 +803,10 @@ input[type='search'] {
   margin-bottom: 12px;
 }
 .dash-filters .grow {
-  flex: 1 1 180px;
+  flex: 1 1 140px;
+}
+.dash-filters select {
+  max-width: 11rem;
 }
 .dash-filters input[type='search'] {
   width: 100%;

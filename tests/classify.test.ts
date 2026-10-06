@@ -115,8 +115,21 @@ describe('flow and income', () => {
     expect(classifyTransactions([t], [CHECKING], [])[0]).toMatchObject({ flow: 'spend', categoryId: 'education' });
   });
   it('other positive amounts on checking fall back to income_other', () => {
-    const t = txn('chk', '2025-12-19', 4000, 'MOBILE DEPOSIT');
+    const t = txn('chk', '2025-12-19', 4000, 'ZZQ HOLDINGS ACH CREDIT');
     expect(classifyTransactions([t], [CHECKING], [])[0]).toMatchObject({ flow: 'income', categoryId: 'income_other' });
+  });
+  it.each([
+    ['ACME CORP PAYROLL ACH CREDIT', 'income_paycheck'],
+    ['ACME CORP TUITION REIMB ACH CREDIT', 'income_refunds'],
+    ['ACME PAYROLL EXPENSE REIMBURSEMENT', 'income_refunds'],
+    ['IRS TREAS 310 TAX REF', 'income_refunds'],
+    ['VENMO CASHOUT ACH CREDIT', 'income_transfers_in'],
+    ['MOBILE DEPOSIT', 'income_transfers_in'],
+    ['ZELLE FROM SOMEONE', 'income_transfers_in'],
+    ['INTEREST PAYMENT', 'income_other'],
+  ])('income %s -> %s', (name, categoryId) => {
+    const t = txn('chk', '2025-12-19', 4000, name);
+    expect(classifyTransactions([t], [CHECKING], [])[0]).toMatchObject({ flow: 'income', categoryId });
   });
   it('unknown spending is uncategorized', () => {
     const t = txn('card', '2025-12-19', -4000, 'ZZQ HOLDINGS OREM UT');

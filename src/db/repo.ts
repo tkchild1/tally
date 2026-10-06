@@ -198,11 +198,12 @@ export interface CategoryRow {
   kind: 'income' | 'expense' | 'system';
   is_fixed: boolean;
   is_custom: boolean;
+  is_earned: boolean;
 }
 
 export async function listCategories(db: Queryable): Promise<CategoryRow[]> {
   const { rows } = await db.query<CategoryRow>(
-    `SELECT id, name, kind, is_fixed, is_custom FROM categories
+    `SELECT id, name, kind, is_fixed, is_custom, is_earned FROM categories
      ORDER BY CASE kind WHEN 'income' THEN 0 WHEN 'expense' THEN 1 ELSE 2 END, name`,
   );
   return rows;
@@ -210,6 +211,10 @@ export async function listCategories(db: Queryable): Promise<CategoryRow[]> {
 
 export async function setCategoryFixed(db: Queryable, id: string, isFixed: boolean): Promise<void> {
   await db.query(`UPDATE categories SET is_fixed = $2 WHERE id = $1`, [id, isFixed]);
+}
+
+export async function setCategoryEarned(db: Queryable, id: string, isEarned: boolean): Promise<void> {
+  await db.query(`UPDATE categories SET is_earned = $2 WHERE id = $1 AND kind = 'income'`, [id, isEarned]);
 }
 
 /** Thrown for a name the user must change; the message is safe to show. */
@@ -220,17 +225,24 @@ async function otherCategoryNames(db: Queryable, exceptId: string | null): Promi
   return rows.map((r) => r.name);
 }
 
-/** Adds a custom category and returns its id. */
-export async function addCategory(db: Queryable, name: string, kind: 'expense' | 'income', isFixed: boolean): Promise<string> {
+/** Adds a custom category and returns its id. `isFixed` applies to spending, `isEarned` to income. */
+export async function addCategory(
+  db: Queryable,
+  name: string,
+  kind: 'expense' | 'income',
+  isFixed: boolean,
+  isEarned = false,
+): Promise<string> {
   const problem = categoryNameProblem(name, await otherCategoryNames(db, null));
   if (problem) throw new CategoryNameError(problem);
   const { rows } = await db.query<{ id: string }>(`SELECT id FROM categories`);
   const id = customCategoryId(name, rows.map((r) => r.id));
-  await db.query(`INSERT INTO categories (id, name, kind, is_fixed, is_custom) VALUES ($1, $2, $3, $4, true)`, [
+  await db.query(`INSERT INTO categories (id, name, kind, is_fixed, is_earned, is_custom) VALUES ($1, $2, $3, $4, $5, true)`, [
     id,
     name.trim(),
     kind,
     kind === 'expense' && isFixed,
+    kind === 'income' && isEarned,
   ]);
   return id;
 }
@@ -260,12 +272,12 @@ export async function deleteCategory(db: Db, id: string): Promise<void> {
   });
 }
 
-/** Removes custom categories and restores the built-in names and fixed/variable defaults. */
+/** Removes custom categories and restores the built-in names and fixed/earned defaults. */
 export async function resetCategories(db: Queryable): Promise<void> {
   await db.query(`DELETE FROM categories WHERE is_custom`);
   await db.query(
-    `UPDATE categories c SET name = d.name, is_fixed = d."isFixed"
-     FROM jsonb_to_recordset($1::jsonb) AS d(id text, name text, "isFixed" boolean)
+    `UPDATE categories c SET name = d.name, is_fixed = d."isFixed", is_earned = COALESCE(d."isEarned", false)
+     FROM jsonb_to_recordset($1::jsonb) AS d(id text, name text, "isFixed" boolean, "isEarned" boolean)
      WHERE c.id = d.id`,
     [JSON.stringify(DEFAULT_CATEGORIES)],
   );
@@ -382,6 +394,8 @@ export async function listMonths(db: Queryable): Promise<string[]> {
 export interface MonthTotalRow {
   month: string;
   income: number;
+  /** The part of `income` in categories marked earned. */
+  earned: number;
   spending: number;
   fixed: number;
   variable: number;
@@ -396,6 +410,7 @@ export async function monthlyTotals(db: Queryable, filter: DashboardFilter = {})
   const { rows } = await db.query<MonthTotalRow>(
     `SELECT to_char(t.posted_on, 'YYYY-MM') AS month,
            COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'income'), 0)::int AS income,
+           COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'income' AND c.is_earned), 0)::int AS earned,
            (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend'), 0))::int AS spending,
            (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend' AND c.is_fixed), 0))::int AS fixed,
            (-COALESCE(SUM(t.amount_cents) FILTER (WHERE t.flow = 'spend' AND NOT c.is_fixed), 0))::int AS variable,

@@ -166,7 +166,7 @@ function useFilteredMonths(filter: DashboardFilter): MonthTotalRow[] | undefined
       return months
         .slice()
         .reverse()
-        .map((m) => byMonth.get(m) ?? { month: m, income: 0, spending: 0, fixed: 0, variable: 0, tithing: 0 });
+        .map((m) => byMonth.get(m) ?? { month: m, income: 0, earned: 0, spending: 0, fixed: 0, variable: 0, tithing: 0 });
     },
     [filter.search, filter.categoryId],
   );
@@ -290,10 +290,11 @@ function EmptyDashboard() {
 function PeriodSummary({ period, filter }: { period: string; filter: DashboardFilter }) {
   const totals = useQuery((d) => monthlyTotals(d, filter), [filter.search, filter.categoryId]);
   if (!totals.data) return null;
-  const t = { income: 0, spending: 0, fixed: 0, variable: 0 };
+  const t = { income: 0, earned: 0, spending: 0, fixed: 0, variable: 0 };
   for (const r of totals.data) {
     if (!monthInPeriod(r.month, period)) continue;
     t.income += r.income;
+    t.earned += r.earned;
     t.spending += r.spending;
     t.fixed += r.fixed;
     t.variable += r.variable;
@@ -306,9 +307,17 @@ function PeriodSummary({ period, filter }: { period: string; filter: DashboardFi
   return (
     <div className="kpis">
       <div className="kpi">
-        <span className="kpi-label">Income</span>
-        <Money cents={t.income} className="kpi-value" />
-        {noIncomeYet && <span className="kpi-note">None yet</span>}
+        <span className="kpi-label">Earned</span>
+        <Money cents={t.earned} className="kpi-value" />
+        {noIncomeYet ? (
+          <span className="kpi-note">None yet</span>
+        ) : (
+          t.income !== t.earned && (
+            <span className="kpi-note">
+              + <Money cents={t.income - t.earned} className="money-neutral" /> other
+            </span>
+          )
+        )}
       </div>
       <div className="kpi">
         <span className="kpi-label">{inProgress ? 'Spent so far' : 'Spending'}</span>
@@ -387,7 +396,7 @@ function TithingCard({ period }: { period: string }) {
   if (!totals.data) return null;
   const year = isYearPeriod(period);
   const s = tithingSummary(
-    totals.data.map((t) => ({ month: t.month, income: t.income, tithingPaid: t.tithing })),
+    totals.data.map((t) => ({ month: t.month, income: t.earned, tithingPaid: t.tithing })),
     year ? `${period}-12` : period,
   );
   const headline = year ? s.yearToDate : s.month;
@@ -396,7 +405,7 @@ function TithingCard({ period }: { period: string }) {
   return (
     <CollapsibleCard
       id="tithing"
-      title={`Tithing (${TITHING_RATE_BP / 100}% of income)`}
+      title={`Tithing (${TITHING_RATE_BP / 100}% of earned income)`}
       summary={
         <>
           <Money cents={Math.abs(headline.remaining)} className="money-neutral" />{' '}
@@ -408,7 +417,10 @@ function TithingCard({ period }: { period: string }) {
         {!year && <TithingRow label={formatMonth(period)} t={s.month} />}
         <TithingRow label={yearLabel} t={s.yearToDate} />
       </ul>
-      <p className="muted small">Payments in the Tithing category count as paid.</p>
+      <p className="muted small">
+        Only income in categories marked Earned (in <a href="#/settings">Settings</a>) counts. Payments in the Tithing
+        category count as paid.
+      </p>
     </CollapsibleCard>
   );
 }

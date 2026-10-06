@@ -5,11 +5,15 @@ export interface CategoryDef {
   name: string;
   kind: CategoryKind;
   isFixed: boolean;
+  /** Income only: earned income (pay for work). Tithing is owed on earned income. */
+  isEarned?: boolean;
 }
 
-/** Seeded into `categories` on first run. Users can toggle `isFixed` later. */
+/** Seeded into `categories` on first run. Users can toggle `isFixed` and `isEarned` later. */
 export const DEFAULT_CATEGORIES: readonly CategoryDef[] = [
-  { id: 'income_paycheck', name: 'Paycheck', kind: 'income', isFixed: false },
+  { id: 'income_paycheck', name: 'Paycheck', kind: 'income', isFixed: false, isEarned: true },
+  { id: 'income_transfers_in', name: 'Venmo & transfers in', kind: 'income', isFixed: false },
+  { id: 'income_refunds', name: 'Refunds & reimbursements', kind: 'income', isFixed: false },
   { id: 'income_other', name: 'Other income', kind: 'income', isFixed: false },
   { id: 'housing', name: 'Housing', kind: 'expense', isFixed: true },
   { id: 'utilities', name: 'Utilities & phone', kind: 'expense', isFixed: true },
@@ -44,9 +48,11 @@ export interface DefaultRule {
  * Users teach the app everything else via merchant rules.
  */
 export const DEFAULT_RULES: readonly DefaultRule[] = [
-  // Income
+  // Income. Refunds first, so a reimbursement paid through payroll isn't counted as earned.
+  { flow: 'income', categoryId: 'income_refunds', pattern: /REFUND|REIMB|REBATE|IRS TREAS|TAX REF/ },
   { flow: 'income', categoryId: 'income_paycheck', pattern: /PAYROLL|DIRECT DEP|DIR DEP|SALARY|\bPAYCHECK/ },
-  { flow: 'income', categoryId: 'income_other', pattern: /INTEREST|DIVIDEND|CASHBACK|CASH BACK|ZELLE FROM|VENMO/ },
+  { flow: 'income', categoryId: 'income_transfers_in', pattern: /VENMO|ZELLE|CASH APP|PAYPAL|MOBILE DEP|REMOTE DEP/ },
+  { flow: 'income', categoryId: 'income_other', pattern: /INTEREST|DIVIDEND|CASHBACK|CASH BACK/ },
 
   // Spending: specific before general
   { flow: 'spend', categoryId: 'tithing', pattern: /TITHING|\bTITHE|CHURCH OF JESUS CHRIST|\bLDS\b/ },

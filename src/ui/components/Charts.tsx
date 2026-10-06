@@ -20,7 +20,7 @@ import type { CategorySpendRow, MonthTotalRow } from '../../db/repo';
 import { formatCompactCents, formatDate, formatDateShort, formatMonth } from '../format';
 
 /** Color-blind-safe categorical palette (README section 10). Never the only signal. */
-export const PALETTE = { blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a' } as const;
+export const PALETTE = { blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a', lightAqua: '#8fd8bc' } as const;
 
 const animate = !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
 
@@ -53,8 +53,10 @@ function DataTable({ caption, head, rows }: { caption: string; head: string[]; r
   );
 }
 
+/** Income (earned stacked under other) beside spending, per month. */
 export function IncomeSpendingChart({ data }: { data: MonthTotalRow[] }) {
-  const rows = data.map((d) => ({ ...d, label: formatMonth(d.month, true) }));
+  const rows = data.map((d) => ({ ...d, other: d.income - d.earned, label: formatMonth(d.month, true) }));
+  const anyOther = rows.some((r) => r.other !== 0);
   return (
     <figure className="chart">
       <div aria-hidden="true">
@@ -65,15 +67,38 @@ export function IncomeSpendingChart({ data }: { data: MonthTotalRow[] }) {
             <YAxis tickFormatter={formatCompactCents} width={52} tickLine={false} axisLine={false} />
             <Tooltip formatter={money} labelFormatter={(_, p) => (p[0] ? formatMonth(p[0].payload.month) : '')} />
             <Legend />
-            <Bar dataKey="income" name="Income" fill={PALETTE.aqua} radius={[3, 3, 0, 0]} isAnimationActive={animate} />
+            <Bar
+              dataKey="earned"
+              name="Earned"
+              stackId="income"
+              fill={PALETTE.aqua}
+              radius={anyOther ? [0, 0, 0, 0] : [3, 3, 0, 0]}
+              isAnimationActive={animate}
+            />
+            {anyOther && (
+              <Bar
+                dataKey="other"
+                name="Other income"
+                stackId="income"
+                fill={PALETTE.lightAqua}
+                radius={[3, 3, 0, 0]}
+                isAnimationActive={animate}
+              />
+            )}
             <Bar dataKey="spending" name="Spending" fill={PALETTE.blue} radius={[3, 3, 0, 0]} isAnimationActive={animate} />
           </BarChart>
         </ResponsiveContainer>
       </div>
       <DataTable
         caption="Income and spending by month"
-        head={['Month', 'Income', 'Spending', 'Net']}
-        rows={data.map((d) => [formatMonth(d.month), formatCents(d.income), formatCents(d.spending), formatCents(d.income - d.spending)])}
+        head={['Month', 'Earned', 'Other', 'Spending', 'Net']}
+        rows={data.map((d) => [
+          formatMonth(d.month),
+          formatCents(d.earned),
+          formatCents(d.income - d.earned),
+          formatCents(d.spending),
+          formatCents(d.income - d.spending),
+        ])}
       />
     </figure>
   );

@@ -3,7 +3,10 @@ import type { Db, Queryable } from './client';
 import { reclassifyAll } from './reclassify';
 import { resetCategories } from './repo';
 
-/** What each table contributes to a backup. Backups made before custom categories hold only id and is_fixed. */
+/**
+ * What each table contributes to a backup. Backups made before custom categories hold only id and
+ * is_fixed for categories; ones made before earned income have no is_earned (the defaults stay).
+ */
 const EXPORT_SQL: Record<BackupTableName, string> = {
   accounts: `SELECT * FROM accounts ORDER BY id`,
   balance_snapshots: `SELECT * FROM balance_snapshots ORDER BY account_id, as_of`,
@@ -11,7 +14,7 @@ const EXPORT_SQL: Record<BackupTableName, string> = {
   transactions: `SELECT * FROM transactions ORDER BY id`,
   merchant_rules: `SELECT * FROM merchant_rules ORDER BY id`,
   merchant_flags: `SELECT * FROM merchant_flags ORDER BY merchant`,
-  categories: `SELECT id, name, kind, is_fixed, is_custom FROM categories ORDER BY id`,
+  categories: `SELECT id, name, kind, is_fixed, is_custom, is_earned FROM categories ORDER BY id`,
   budgets: `SELECT * FROM budgets ORDER BY category_id`,
 };
 
@@ -53,23 +56,25 @@ export async function restoreBackup(db: Db, data: BackupData): Promise<void> {
 }
 
 /**
- * Built-in categories always exist; the backup supplies their names and fixed choice. Custom
+ * Built-in categories always exist; the backup supplies their names and fixed/earned choices. Custom
  * categories are replaced by the backup's, before any transaction or rule refers to them.
  */
 async function restoreCategories(tx: Queryable, rows: readonly BackupRow[]): Promise<void> {
   await resetCategories(tx);
   const json = JSON.stringify(rows);
   await tx.query(
-    `INSERT INTO categories (id, name, kind, is_fixed, is_custom)
-     SELECT r.id, r.name, r.kind, COALESCE(r.is_fixed, false), true
-     FROM jsonb_to_recordset($1::jsonb) AS r(id text, name text, kind text, is_fixed boolean, is_custom boolean)
+    `INSERT INTO categories (id, name, kind, is_fixed, is_earned, is_custom)
+     SELECT r.id, r.name, r.kind, COALESCE(r.is_fixed, false), r.kind = 'income' AND COALESCE(r.is_earned, false), true
+     FROM jsonb_to_recordset($1::jsonb) AS r(id text, name text, kind text, is_fixed boolean, is_earned boolean, is_custom boolean)
      WHERE r.is_custom AND r.kind IN ('expense', 'income')
      ON CONFLICT (id) DO NOTHING`,
     [json],
   );
   await tx.query(
-    `UPDATE categories c SET is_fixed = COALESCE(r.is_fixed, c.is_fixed), name = COALESCE(NULLIF(trim(r.name), ''), c.name)
-     FROM jsonb_to_recordset($1::jsonb) AS r(id text, name text, is_fixed boolean)
+    `UPDATE categories c SET is_fixed = COALESCE(r.is_fixed, c.is_fixed),
+       is_earned = c.kind = 'income' AND COALESCE(r.is_earned, c.is_earned),
+       name = COALESCE(NULLIF(trim(r.name), ''), c.name)
+     FROM jsonb_to_recordset($1::jsonb) AS r(id text, name text, is_fixed boolean, is_earned boolean)
      WHERE c.id = r.id AND c.kind <> 'system'`,
     [json],
   );

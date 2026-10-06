@@ -12,6 +12,7 @@ import {
   renameAccount,
   renameCategory,
   setBudget,
+  setCategoryEarned,
   setCategoryFixed,
   setMerchantCategory,
   setMerchantFlag,
@@ -52,7 +53,7 @@ async function snapshot(db: Db) {
     txns: txns.map((t) => [t.id, t.posted_on, t.amount_cents, t.merchant, t.flow, t.category_id, t.category_source, t.transfer_group]),
     rules: (await listRules(db)).map((r) => [r.pattern, r.category_id, r.matches]),
     flags: [...(await listMerchantFlags(db)).entries()],
-    categories: (await db.query(`SELECT id, name, kind, is_fixed, is_custom FROM categories ORDER BY id`)).rows,
+    categories: (await db.query(`SELECT id, name, kind, is_fixed, is_custom, is_earned FROM categories ORDER BY id`)).rows,
   };
 }
 
@@ -74,6 +75,8 @@ beforeAll(async () => {
   const custom = await addCategory(source, 'School & work', 'expense', true);
   await setMerchantCategory(source, 'NETFLIX.COM', custom);
   await setBudget(source, custom, 5000);
+  await setCategoryEarned(source, 'income_transfers_in', true);
+  await addCategory(source, 'Side job', 'income', false, true);
   backup = await exportBackup(source, '2026-01-25T12:00:00.000Z');
 });
 
@@ -86,7 +89,7 @@ describe('backup', () => {
     const txn = backup.tables.transactions[0]!;
     expect(txn.posted_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(typeof txn.amount_cents).toBe('number');
-    expect(Object.keys(backup.tables.categories[0]!)).toEqual(['id', 'name', 'kind', 'is_fixed', 'is_custom']);
+    expect(Object.keys(backup.tables.categories[0]!)).toEqual(['id', 'name', 'kind', 'is_fixed', 'is_custom', 'is_earned']);
     expect(backupFileName('2026-01-25')).toBe('tally-2026-01-25.budgetbackup.json');
   });
 
@@ -143,6 +146,8 @@ describe('backup', () => {
     expect(cats.find((c) => c.name === 'School & work')).toMatchObject({ is_custom: true, is_fixed: true, kind: 'expense' });
     const movie = (await listTransactions(fresh, { search: 'NETFLIX', limit: 1 }))[0]!;
     expect(movie.category_name).toBe('School & work');
+    expect(cats.find((c) => c.name === 'Side job')).toMatchObject({ is_custom: true, is_earned: true, kind: 'income' });
+    expect(cats.find((c) => c.id === 'income_transfers_in')?.is_earned).toBe(true);
   });
 
   it('a backup from before custom categories restores, and drops custom categories it does not know', async () => {
@@ -159,12 +164,14 @@ describe('backup', () => {
     const target = await openDb();
     await addCategory(target, 'Hobbies', 'expense', false);
     await renameCategory(target, 'dining', 'Eating out');
+    await setCategoryEarned(target, 'income_paycheck', false);
     await restoreBackup(target, old);
     const cats = await listCategories(target);
     expect(cats.some((c) => c.is_custom)).toBe(false);
     expect(cats.find((c) => c.id === 'dining')?.name).toBe('Dining');
     expect(cats.find((c) => c.id === 'education')?.name).toBe('Education');
     expect(cats.find((c) => c.id === 'groceries')?.is_fixed).toBe(true);
+    expect(cats.filter((c) => c.is_earned).map((c) => c.id)).toEqual(['income_paycheck']);
   });
 
   it('a backup that breaks a constraint rolls back and leaves current data alone', async () => {

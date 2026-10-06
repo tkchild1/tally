@@ -693,6 +693,13 @@ Milestone 2 added Recharts 3. Milestones 3 and 4 added no dependencies (WebCrypt
   year sums the KPIs ("so far" for the current year), the category chart and top merchants over the whole year, and the
   Monthly spending chart shows just that year's months. Budgets multiply each monthly limit by the months of that year
   that have data, with the pace marker spread across them. Tithing shows one row for the year.
+- **Earned vs other income (owner addition).** Income categories have an "Earned" flag (migration 4 adds
+  `categories.is_earned`; Paycheck is earned by default). Two new default income categories catch money that isn't pay:
+  "Venmo & transfers in" (Venmo, Zelle, Cash App, PayPal, mobile deposits) and "Refunds & reimbursements" (REFUND, REIMB,
+  rebates, tax refunds). The refunds rule runs before the paycheck rule, so a reimbursement paid through payroll isn't
+  counted as earned. The dashboard's first KPI is earned income with "+ $X other" beneath it; Net still uses all income.
+  Income vs spending stacks earned and other income. **Tithing is 10% of earned income only.** Backups carry
+  `is_earned`; older backups keep the defaults.
 - **Import picker has no `accept` filter.** iOS doesn't recognize `.qfx`, so a filter greys out every file; the parser
   already rejects files that aren't OFX, with a clear message.
 - **Saving the backup file:** a normal download, plus a "Share / Save to Files" button when the browser can share files
