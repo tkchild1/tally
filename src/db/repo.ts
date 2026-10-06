@@ -65,10 +65,16 @@ export interface TransactionRow {
 
 export interface TransactionFilter {
   accountId?: string;
-  /** "YYYY-MM" */
-  month?: string;
+  /** A month ("YYYY-MM") or a whole year ("YYYY"). */
+  period?: string;
   categoryId?: string;
   flow?: Flow;
+  /** Income and spending only, as the dashboard totals count them. */
+  excludeTransfers?: boolean;
+  /** Only categories marked earned (true) or not earned (false). */
+  earned?: boolean;
+  /** Only categories marked fixed (true) or variable (false). */
+  fixed?: boolean;
   search?: string;
   limit?: number;
   offset?: number;
@@ -87,12 +93,16 @@ function buildConditions(f: TransactionFilter, params: unknown[]): string[] {
     where.push(sql.replace('?', `$${params.length}`));
   };
   if (f.accountId) add('t.account_id = ?', f.accountId);
-  if (f.month) {
-    add(`t.posted_on >= ?::date`, `${f.month}-01`);
-    add(`t.posted_on < (?::date + interval '1 month')`, `${f.month}-01`);
+  if (f.period) {
+    const { start, end } = periodBounds(f.period);
+    add(`t.posted_on >= ?::date`, start);
+    add(`t.posted_on < ?::date`, end);
   }
   if (f.categoryId) add('t.category_id = ?', f.categoryId);
   if (f.flow) add('t.flow = ?', f.flow);
+  if (f.excludeTransfers) where.push(`t.flow <> 'transfer'`);
+  if (f.earned !== undefined) add('t.category_id IN (SELECT id FROM categories WHERE is_earned = ?)', f.earned);
+  if (f.fixed !== undefined) add('t.category_id IN (SELECT id FROM categories WHERE is_fixed = ?)', f.fixed);
   if (f.search?.trim()) {
     params.push(`%${f.search.trim().replace(/[\\%_]/g, (c) => '\\' + c)}%`);
     const p = `$${params.length}`;
@@ -130,10 +140,18 @@ export async function listTransactions(db: Queryable, f: TransactionFilter = {})
 }
 
 export async function countTransactions(db: Queryable, f: TransactionFilter = {}): Promise<number> {
+  return (await transactionTotals(db, f)).count;
+}
+
+/** How many transactions match, and their amounts added up (money out negative). */
+export async function transactionTotals(db: Queryable, f: TransactionFilter = {}): Promise<{ count: number; sum: number }> {
   const params: unknown[] = [];
   const where = buildWhere(f, params);
-  const { rows } = await db.query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM transactions t ${where}`, params);
-  return rows[0]?.n ?? 0;
+  const { rows } = await db.query<{ count: number; sum: number }>(
+    `SELECT COUNT(*)::int AS count, COALESCE(SUM(t.amount_cents), 0)::int AS sum FROM transactions t ${where}`,
+    params,
+  );
+  return rows[0] ?? { count: 0, sum: 0 };
 }
 
 /**

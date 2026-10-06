@@ -700,6 +700,11 @@ Milestone 2 added Recharts 3. Milestones 3 and 4 added no dependencies (WebCrypt
   counted as earned. The dashboard's first KPI is earned income with "+ $X other" beneath it; Net still uses all income.
   Income vs spending stacks earned and other income. **Tithing is 10% of earned income only.** Backups carry
   `is_earned`; older backups keep the defaults.
+- **Dashboard tiles open Activity (owner addition).** Earned, Spending and Net (and the Fixed/Variable legend) link to
+  `#/transactions?period=…&type=…&q=…&category=…`, carrying the dashboard's period and filter. The hash router ignores
+  everything after `?`; the Activity page reads it once on open. Activity's Type picker adds earned/other income,
+  fixed/variable spending and "Income & spending", and its month picker gains whole years. A "total" line under the
+  filters lets you check it against the tile. Tiles show whole dollars and shrink the text to fit narrow phones.
 - **Import picker has no `accept` filter.** iOS doesn't recognize `.qfx`, so a filter greys out every file; the parser
   already rejects files that aren't OFX, with a clear message.
 - **Saving the backup file:** a normal download, plus a "Share / Save to Files" button when the browser can share files

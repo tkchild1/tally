@@ -19,7 +19,9 @@ import { BudgetBar } from '../components/BudgetBar';
 import { TITHING_RATE_BP, tithingSummary, type TithingTotals } from '../../lib/tithing';
 import { Banner } from '../components/Banner';
 import { Card } from '../components/Card';
+import { activityLink, type ActivityType } from '../activityLink';
 import { CollapsibleCard } from '../components/CollapsibleCard';
+import { PeriodOptions } from '../components/PeriodOptions';
 import { BalanceChart, CategoryChart, IncomeSpendingChart, MonthlySpendChart } from '../components/Charts';
 import { Money } from '../components/Money';
 import { BackupReminderBanner, CoverageBanners, TransferHintBanners, UncategorizedBanner } from '../components/StatusBanners';
@@ -54,33 +56,22 @@ export function DashboardPage() {
 
   return (
     <div className="page">
-      <div className="page-head">
+      <div className="dash-head">
         <h1>Dashboard</h1>
         <label>
           <span className="visually-hidden">Month or year</span>
           <select value={period} onChange={(e) => setPicked(e.target.value)}>
-            {years.map((y) => (
-              <optgroup key={y} label={y}>
-                <option value={y}>All of {y}</option>
-                {monthList
-                  .filter((m) => monthInPeriod(m, y))
-                  .map((m) => (
-                    <option key={m} value={m}>
-                      {formatMonth(m)}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
+            <PeriodOptions months={monthList} />
           </select>
         </label>
       </div>
 
-      <div className="filters dash-filters" role="search">
-        <label className="grow">
+      <div className="dash-filters" role="search">
+        <label>
           <span className="visually-hidden">Filter the dashboard</span>
           <input
             type="search"
-            placeholder="Filter, e.g. golf"
+            placeholder="Filter"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             enterKeyHint="search"
@@ -304,28 +295,31 @@ function PeriodSummary({ period, filter }: { period: string; filter: DashboardFi
   const inProgress = monthInPeriod(todayISO().slice(0, 7), period);
   const noIncomeYet = inProgress && t.income === 0 && !filter.search && !filter.categoryId;
 
+  const link = (type: ActivityType) => activityLink({ period, type, search: filter.search, categoryId: filter.categoryId });
+
   return (
     <div className="kpis">
-      <div className="kpi">
+      <a className="kpi kpi-link" href={link('income-earned')}>
         <span className="kpi-label">Earned</span>
-        <Money cents={t.earned} className="kpi-value" />
+        <Money cents={t.earned} dollars className="kpi-value" />
         {noIncomeYet ? (
           <span className="kpi-note">None yet</span>
         ) : (
           t.income !== t.earned && (
             <span className="kpi-note">
-              + <Money cents={t.income - t.earned} className="money-neutral" /> other
+              +<Money cents={t.income - t.earned} dollars className="money-neutral" /> other
             </span>
           )
         )}
-      </div>
-      <div className="kpi">
+      </a>
+      <a className="kpi kpi-link" href={link('spend')}>
         <span className="kpi-label">{inProgress ? 'Spent so far' : 'Spending'}</span>
-        <Money cents={t.spending} className="kpi-value money-neutral" />
-      </div>
-      <div className="kpi">
+        <Money cents={t.spending} dollars className="kpi-value money-neutral" />
+      </a>
+      <a className="kpi kpi-link" href={link('in-out')}>
         <span className="kpi-label">{inProgress ? 'Net so far' : 'Net'}</span>
-        <Money cents={net} signed className={noIncomeYet ? 'kpi-value money-neutral' : 'kpi-value'} />      </div>
+        <Money cents={net} signed dollars className={noIncomeYet ? 'kpi-value money-neutral' : 'kpi-value'} />
+      </a>
       <div className="kpi kpi-wide">
         <span className="kpi-label">Fixed vs variable spending</span>
         {t.spending <= 0 ? (
@@ -336,13 +330,13 @@ function PeriodSummary({ period, filter }: { period: string; filter: DashboardFi
               <span className="split-fixed" style={{ width: `${fixedShare}%` }} />
             </div>
             <div className="split-legend small">
-              <span>
+              <a href={link('spend-fixed')}>
                 <span className="swatch swatch-fixed" aria-hidden="true" /> Fixed <Money cents={t.fixed} className="money-neutral" />
-              </span>
-              <span>
+              </a>
+              <a href={link('spend-variable')}>
                 <span className="swatch swatch-variable" aria-hidden="true" /> Variable{' '}
                 <Money cents={t.variable} className="money-neutral" />
-              </span>
+              </a>
             </div>
           </>
         )}

@@ -28,7 +28,9 @@ import {
   setTransactionFlow,
   spendingByCategory,
   topMerchants,
+  transactionTotals,
 } from '../src/db/repo';
+import { ACTIVITY_TYPES } from '../src/ui/activityLink';
 import { balanceSeries } from '../src/lib/balance';
 import { generateFakeExports } from '../src/lib/fake';
 import { detectSubscriptions } from '../src/lib/subscriptions';
@@ -204,6 +206,24 @@ describe('Milestone 2 acceptance on demo data', () => {
 
     const both = await filterSummary(db, { search: 'golf', categoryId: 'groceries' });
     expect(both).toMatchObject({ spent: 0, purchases: 0, first: null });
+  });
+
+  it('each dashboard total adds up to the Activity filter it links to', async () => {
+    const months = (await monthlyTotals(db)).filter((m) => m.month.startsWith('2025'));
+    const sum = (k: 'income' | 'earned' | 'spending' | 'fixed' | 'variable') => months.reduce((s, m) => s + m[k], 0);
+    const total = async (type: keyof typeof ACTIVITY_TYPES, search?: string) =>
+      (await transactionTotals(db, { period: '2025', search, ...ACTIVITY_TYPES[type].filter })).sum;
+    expect(await total('income-earned')).toBe(sum('earned'));
+    expect(await total('income-other')).toBe(sum('income') - sum('earned'));
+    expect(-(await total('spend'))).toBe(sum('spending'));
+    expect(-(await total('spend-fixed'))).toBe(sum('fixed'));
+    expect(-(await total('spend-variable'))).toBe(sum('variable'));
+    expect(await total('in-out')).toBe(sum('income') - sum('spending'));
+
+    const golf = (await monthlyTotals(db, { search: 'golf' })).filter((m) => m.month.startsWith('2025'));
+    expect(-(await total('spend', 'golf'))).toBe(golf.reduce((s, m) => s + m.spending, 0));
+    const dec = (await monthlyTotals(db)).find((m) => m.month === '2025-12')!;
+    expect(-(await transactionTotals(db, { period: '2025-12', flow: 'spend' })).sum).toBe(dec.spending);
   });
 
   it('budgets: set, update, list, delete; per-category monthly spending matches the category chart', async () => {

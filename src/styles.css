@@ -488,8 +488,28 @@ select {
   flex-direction: column;
   gap: 4px;
 }
+.kpi-link {
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+  container-type: inline-size;
+}
+.kpi-link:hover {
+  border-color: var(--accent);
+}
+.kpi-link:active {
+  background: var(--bg);
+}
 .kpi-wide {
   grid-column: 1 / -1;
+}
+.split-legend a {
+  color: inherit;
+  text-decoration: none;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .kpi-label {
   color: var(--muted);
@@ -509,6 +529,10 @@ select {
   }
   .kpi-value {
     font-size: 1.05rem;
+  }
+  .kpi-link .kpi-value {
+    font-size: min(1.15rem, 17cqi);
+    white-space: nowrap;
   }
 }
 .split {
@@ -799,18 +823,50 @@ input[type='search'] {
 .filters input[type='search'] {
   flex: 1 1 100%;
 }
+/* Dashboard controls: two equal columns, so the period picker lines up with the category picker. */
+.dash-head,
 .dash-filters {
-  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
 }
-.dash-filters .grow {
-  flex: 1 1 140px;
+.txn-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
 }
-.dash-filters select {
-  max-width: 11rem;
+.txn-filters input[type='search'] {
+  grid-column: 1 / -1;
 }
+.txn-filters select,
+.txn-filters input[type='search'] {
+  width: 100%;
+  height: 44px;
+  box-sizing: border-box;
+  font-size: 1rem;
+}
+.txn-filters input[type='search'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.dash-head h1 {
+  margin: 0.25rem 0;
+}
+.dash-filters {
+  margin: 8px 0 12px;
+}
+.dash-head select,
+.dash-filters select,
 .dash-filters input[type='search'] {
   width: 100%;
+  height: 44px;
   box-sizing: border-box;
+  font-size: 1rem;
+}
+.dash-filters input[type='search'] {
+  -webkit-appearance: none;
+  appearance: none;
 }
 input:focus-visible {
   outline: 3px solid var(--info-border);

@@ -1,29 +1,34 @@
 import { useState, type ReactNode } from 'react';
 import {
-  countTransactions,
   listAccounts,
   listCategories,
   listMonths,
   listTransactions,
+  transactionTotals,
   type TransactionFilter,
   type TransactionRow,
 } from '../../db/repo';
-import type { Flow } from '../../lib/categories';
 import { prettyMerchant } from '../../lib/merchant';
+import { ACTIVITY_TYPES, isActivityType, type ActivityType } from '../activityLink';
 import { Money } from '../components/Money';
+import { PeriodOptions } from '../components/PeriodOptions';
 import { TransferHintBanners, UncategorizedBanner } from '../components/StatusBanners';
 import { TransactionSheet } from '../components/TransactionSheet';
-import { formatDateShort, formatMonth, plural } from '../format';
-import { useQuery } from '../hooks';
+import { formatDateShort, plural } from '../format';
+import { hashParams, useQuery } from '../hooks';
 
 const PAGE_SIZE = 200;
 
 export function TransactionsPage() {
-  const [month, setMonth] = useState('');
+  const [initial] = useState(hashParams);
+  const [period, setPeriod] = useState(initial.get('period') ?? '');
   const [accountId, setAccountId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [flow, setFlow] = useState<Flow | ''>('');
-  const [search, setSearch] = useState('');
+  const [categoryId, setCategoryId] = useState(initial.get('category') ?? '');
+  const [type, setType] = useState<ActivityType | ''>(() => {
+    const t = initial.get('type');
+    return isActivityType(t) ? t : '';
+  });
+  const [search, setSearch] = useState(initial.get('q') ?? '');
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [selected, setSelected] = useState<TransactionRow | null>(null);
 
@@ -32,14 +37,14 @@ export function TransactionsPage() {
   const months = useQuery((db) => listMonths(db), []);
 
   const filter: TransactionFilter = {
-    month: month || undefined,
+    period: period || undefined,
     accountId: accountId || undefined,
     categoryId: categoryId || undefined,
-    flow: flow || undefined,
     search: search || undefined,
+    ...(type ? ACTIVITY_TYPES[type].filter : {}),
   };
-  const deps = [month, accountId, categoryId, flow, search];
-  const total = useQuery((db) => countTransactions(db, filter), deps);
+  const deps = [period, accountId, categoryId, type, search];
+  const total = useQuery((db) => transactionTotals(db, filter), deps);
   const txns = useQuery((db) => listTransactions(db, { ...filter, limit }), [...deps, limit]);
   const resetPaging = () => setLimit(PAGE_SIZE);
 
@@ -60,7 +65,7 @@ export function TransactionsPage() {
       <TransferHintBanners />
       <UncategorizedBanner />
 
-      <div className="filters">
+      <div className="txn-filters">
         <input
           type="search"
           placeholder="Search merchant or description"
@@ -71,13 +76,9 @@ export function TransactionsPage() {
             resetPaging();
           }}
         />
-        <Select label="Month" value={month} onChange={(v) => (setMonth(v), resetPaging())}>
+        <Select label="Month or year" value={period} onChange={(v) => (setPeriod(v), resetPaging())}>
           <option value="">All months</option>
-          {months.data?.map((m) => (
-            <option key={m} value={m}>
-              {formatMonth(m)}
-            </option>
-          ))}
+          {months.data && <PeriodOptions months={months.data} />}
         </Select>
         <Select label="Account" value={accountId} onChange={(v) => (setAccountId(v), resetPaging())}>
           <option value="">All accounts</option>
@@ -95,14 +96,25 @@ export function TransactionsPage() {
             </option>
           ))}
         </Select>
-        <Select label="Type" value={flow} onChange={(v) => (setFlow(v as Flow | ''), resetPaging())}>
+        <Select label="Type" value={type} onChange={(v) => (setType(v as ActivityType | ''), resetPaging())}>
           <option value="">All types</option>
-          <option value="spend">Spending</option>
-          <option value="income">Income</option>
-          <option value="transfer">Transfers</option>
+          {Object.entries(ACTIVITY_TYPES).map(([value, t]) => (
+            <option key={value} value={value}>
+              {t.label}
+            </option>
+          ))}
         </Select>
       </div>
-      {total.data !== undefined && <p className="muted small">{plural(total.data, 'transaction')}</p>}
+      {total.data !== undefined && (
+        <p className="muted small">
+          {plural(total.data.count, 'transaction')}
+          {total.data.count > 0 && type !== '' && type !== 'transfer' && (
+            <>
+              , total <Money cents={type.startsWith('spend') ? -total.data.sum : total.data.sum} signed={type === 'in-out'} className="money-neutral" />
+            </>
+          )}
+        </p>
+      )}
 
       {txns.data && txns.data.length > 0 && (
         <ul className="txn-list">
@@ -113,7 +125,7 @@ export function TransactionsPage() {
       )}
       {txns.data?.length === 0 && <p className="muted">No transactions match these filters.</p>}
 
-      {txns.data && total.data !== undefined && txns.data.length < total.data && (
+      {txns.data && total.data !== undefined && txns.data.length < total.data.count && (
         <button type="button" className="btn btn-secondary btn-block" onClick={() => setLimit((l) => l + PAGE_SIZE)}>
           Load more
         </button>

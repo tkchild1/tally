@@ -33,6 +33,12 @@ describe('cents formatting', () => {
     expect(formatCents(99)).toBe('$0.99');
     expect(formatCents(100, { signed: true })).toBe('+$1.00');
   });
+  it('rounds to whole dollars when asked', () => {
+    expect(formatCents(1_806_666, { dollars: true, signed: true })).toBe('+$18,067');
+    expect(formatCents(-123_449, { dollars: true })).toBe('\u2212$1,234');
+    expect(formatCents(-49, { dollars: true, signed: true })).toBe('$0');
+    expect(formatCents(150, { dollars: true })).toBe('$2');
+  });
 });
 
 describe('dates', () => {

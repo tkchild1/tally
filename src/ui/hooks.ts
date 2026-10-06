@@ -57,8 +57,15 @@ export function useQuery<T>(fn: (db: Db) => Promise<T>, deps: readonly unknown[]
 }
 
 /** Tiny hash router: "#/transactions" -> "transactions". */
+/** Query parameters after the route, e.g. `#/transactions?type=spend` gives `type=spend`. */
+export function hashParams(): URLSearchParams {
+  const hash = window.location.hash;
+  const q = hash.indexOf('?');
+  return new URLSearchParams(q === -1 ? '' : hash.slice(q + 1));
+}
+
 export function useHashRoute(defaultRoute: string): string {
-  const read = () => window.location.hash.replace(/^#\/?/, '') || defaultRoute;
+  const read = () => window.location.hash.replace(/^#\/?/, '').split('?')[0] || defaultRoute;
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const onChange = () => setRoute(read());

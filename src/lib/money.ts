@@ -35,15 +35,18 @@ export function centsToDecimal(cents: Cents): string {
 
 const MINUS = '\u2212';
 
-/** Display format: "$1,234.56", with a real minus sign (U+2212) for negatives. */
-export function formatCents(cents: Cents, opts: { signed?: boolean } = {}): string {
+/**
+ * Display format: "$1,234.56", with a real minus sign (U+2212) for negatives.
+ * `dollars` rounds to the nearest whole dollar and drops the cents ("$1,235").
+ */
+export function formatCents(cents: Cents, opts: { signed?: boolean; dollars?: boolean } = {}): string {
   assertCents(cents);
   const abs = Math.abs(cents);
-  const whole = Math.floor(abs / 100)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const wholeDollars = opts.dollars ? Math.round(abs / 100) : Math.floor(abs / 100);
+  const whole = wholeDollars.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const sign = cents < 0 && (!opts.dollars || wholeDollars > 0) ? MINUS : opts.signed && cents > 0 ? '+' : '';
+  if (opts.dollars) return `${sign}$${whole}`;
   const frac = String(abs % 100).padStart(2, '0');
-  const sign = cents < 0 ? MINUS : opts.signed && cents > 0 ? '+' : '';
   return `${sign}$${whole}.${frac}`;
 }
 
