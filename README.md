@@ -3,10 +3,21 @@
 > **This README is the build spec.** It is written so an AI coding agent (Cursor) can build the whole
 > app from it, and so a human can understand every design decision later. Read it fully before writing code.
 
-**Status:** Milestones 1 (foundation and import), 2 (classification, dashboard, subscriptions), and 3 (backup, PWA install,
-deploy) are built; Milestone 3's on-iPhone checks are for the owner (below). See section 19 for where the build refines this spec.
+**Status:** All four milestones are built: 1 (foundation and import), 2 (classification, dashboard, subscriptions), 3 (backup,
+PWA install, deploy), and 4 (budgets and polish). The on-iPhone checks are for the owner (below). See section 19 for where the
+build refines this spec.
 
 **Live app:** https://tkchild1.github.io/tally/ (deployed by GitHub Actions on every push to `main`).
+
+Screenshots use the built-in **fake demo data** only:
+
+<p>
+  <img src="docs/screenshots/dashboard.png" alt="Dashboard: income, spending and net KPIs, fixed vs variable split, budget progress" width="200">
+  <img src="docs/screenshots/dashboard-filter.png" alt="Dashboard filtered to golf: KPIs, all-time total and top merchants" width="200">
+  <img src="docs/screenshots/budgets.png" alt="Budgets: budgeted, spent and left, with a progress bar per category" width="200">
+  <img src="docs/screenshots/transactions.png" alt="Transactions list with search and filters" width="200">
+  <img src="docs/screenshots/subscriptions.png" alt="Detected recurring charges with monthly and yearly totals" width="200">
+</p>
 
 ### Install on iPhone
 1. Open the live app link in **Safari** (not Chrome; only Safari can add web apps to the Home Screen).
@@ -637,7 +648,7 @@ two yearly charges 365 days apart -> detected as yearly; price change flagged; l
 ## 19. Implementation notes (where the build refines this spec)
 
 Installed versions at Milestone 1: TypeScript 7, Vite 8, Vitest 5, React 19, PGlite 0.5, vite-plugin-pwa 2.
-Milestone 2 added Recharts 3. Milestone 3 added no dependencies (WebCrypto is built in).
+Milestone 2 added Recharts 3. Milestones 3 and 4 added no dependencies (WebCrypto is built in).
 
 - **Two TypeScript projects.** `tsconfig.app.json` covers `src/` (DOM types, no Node types); `tsconfig.node.json` covers
   `tests/`, `scripts/`, and the config files. `npm run typecheck` runs both. `npm run build` = typecheck + `vite build`.
@@ -704,3 +715,17 @@ Milestone 2 added Recharts 3. Milestone 3 added no dependencies (WebCrypto is bu
 - **Multi-tab guard** is implemented: an exclusive Web Lock (`navigator.locks`) is held for the life of the page, and a
   second tab shows "Tally is open in another tab".
 - **Build warnings you can ignore:** PGlite's Emscripten output uses `eval` and makes a large JS chunk.
+- **Budgets** (`src/lib/budgets.ts`, Budgets tab, and a dashboard card showing the 4 budgets closest to or over their
+  limit). Status is "On track" below 90% of the limit, "Almost at limit" from 90%, "Over budget" above 100%; the words, not
+  just the color, carry the status. In the current month a thin line on each bar marks how much of the month has passed,
+  and the text warns when spending is ahead of it. "Usually $X a month" averages the last 3 complete months (months with
+  no spending count as $0) and can be used as the limit with one tap. A category whose refunds outweigh its spending counts
+  as $0 spent. No rollover.
+- **Stale-data banner** names each account whose newest transaction is more than 7 days old, grouped by date, instead of
+  using the last import date (an import of an old file would otherwise hide that an account is behind).
+- **Errors.** A failed query throws to a per-page error boundary with "Try again" and "Reload"; it never shows the error
+  text, since that could contain transaction data.
+- **Accessibility pass:** a "Skip to content" link, visible focus outlines on every control, the transaction sheet keeps
+  Tab inside it and returns focus to the row that opened it, all text meets WCAG AA contrast in light and dark mode, and
+  charts stop animating when the system asks for reduced motion. On narrow phones the tab bar shows "Activity" and
+  "Recurring" (screen readers still hear the full names).
