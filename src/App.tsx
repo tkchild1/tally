@@ -6,6 +6,7 @@ import { DbContext, useHashRoute } from './ui/hooks';
 import { BudgetsPage } from './ui/pages/BudgetsPage';
 import { DashboardPage } from './ui/pages/DashboardPage';
 import { ImportPage } from './ui/pages/ImportPage';
+import { ReviewPage } from './ui/pages/ReviewPage';
 import { SettingsPage } from './ui/pages/SettingsPage';
 import { SubscriptionsPage } from './ui/pages/SubscriptionsPage';
 import { TransactionsPage } from './ui/pages/TransactionsPage';
@@ -26,6 +27,7 @@ const PAGES: Record<string, () => ReactElement> = {
   subscriptions: SubscriptionsPage,
   import: ImportPage,
   settings: SettingsPage,
+  review: ReviewPage,
 };
 
 /** The hash is the router, so the skip link moves focus itself instead of navigating to #main. */

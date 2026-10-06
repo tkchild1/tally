@@ -3,13 +3,21 @@ import { openDb, type Db } from '../src/db/client';
 import { importFile, importFiles } from '../src/db/importer';
 import { reclassifyAll } from '../src/db/reclassify';
 import {
+  addCategory,
   balanceInputs,
+  CategoryNameError,
   categorySpendByMonth,
   deleteBudget,
+  deleteCategory,
   deleteRule,
+  eraseAllData,
   filterSummary,
   listBudgets,
+  listCategories,
   listRules,
+  renameCategory,
+  setMerchantCategory,
+  uncategorizedMerchants,
   listSpendCharges,
   listTransactions,
   listTransferHints,
@@ -227,5 +235,41 @@ describe('Milestone 2 acceptance on demo data', () => {
       snapshots.filter((s) => accounts.find((a) => a.id === s.accountId)!.kind === kind).reduce((x, s) => x + s.balanceCents, 0);
     expect(last.cash).toBe(snap('checking') + snap('savings'));
     expect(last.net).toBe(last.cash + snap('credit_card'));
+  });
+});
+
+describe('custom categories and uncategorized review', () => {
+  it('lists uncategorized merchants, sorts one into a custom category, and undoes it on delete', async () => {
+    await importFile(db, 'checking.qfx', CHECKING_EXAMPLE);
+    const before = await uncategorizedMerchants(db);
+    expect(before).toHaveLength(1);
+    expect(before[0]).toMatchObject({ count: 1, total: 25000 });
+    const merchant = before[0]!.merchant;
+
+    const id = await addCategory(db, 'School & work', 'expense', false);
+    await expect(addCategory(db, 'school & WORK', 'expense', false)).rejects.toBeInstanceOf(CategoryNameError);
+    await setMerchantCategory(db, merchant, id);
+    expect(await uncategorizedMerchants(db)).toEqual([]);
+    expect((await rowsByMerchant(merchant))[0]!.category_name).toBe('School & work');
+    await setBudget(db, id, 10000);
+
+    await renameCategory(db, id, 'Work');
+    expect((await rowsByMerchant(merchant))[0]!.category_name).toBe('Work');
+    await expect(renameCategory(db, id, 'Dining')).rejects.toBeInstanceOf(CategoryNameError);
+
+    await deleteCategory(db, id);
+    expect((await rowsByMerchant(merchant))[0]!.category_id).toBe('uncategorized');
+    expect(await listRules(db)).toEqual([]);
+    expect(await listBudgets(db)).toEqual([]);
+    await expect(deleteCategory(db, 'dining')).rejects.toThrow();
+  });
+
+  it('erase removes custom categories and restores built-in names', async () => {
+    await addCategory(db, 'Hobbies', 'expense', false);
+    await renameCategory(db, 'education', 'School & work');
+    await eraseAllData(db);
+    const cats = await listCategories(db);
+    expect(cats.some((c) => c.is_custom)).toBe(false);
+    expect(cats.find((c) => c.id === 'education')?.name).toBe('Education');
   });
 });

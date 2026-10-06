@@ -82,6 +82,9 @@ export const MIGRATIONS: readonly string[] = [
   /* 2 */ `
   UPDATE categories SET name = 'Dining' WHERE id = 'dining' AND name = 'Dining & coffee';
   `,
+  /* 3 */ `
+  ALTER TABLE categories ADD COLUMN is_custom boolean NOT NULL DEFAULT false;
+  `,
 ];
 
 export async function getSchemaVersion(db: Queryable): Promise<number> {

@@ -11,7 +11,7 @@ import {
 import type { Flow } from '../../lib/categories';
 import { prettyMerchant } from '../../lib/merchant';
 import { Money } from '../components/Money';
-import { TransferHintBanners } from '../components/StatusBanners';
+import { TransferHintBanners, UncategorizedBanner } from '../components/StatusBanners';
 import { TransactionSheet } from '../components/TransactionSheet';
 import { formatDateShort, formatMonth, plural } from '../format';
 import { useQuery } from '../hooks';
@@ -58,6 +58,7 @@ export function TransactionsPage() {
     <div className="page">
       <h1>Transactions</h1>
       <TransferHintBanners />
+      <UncategorizedBanner />
 
       <div className="filters">
         <input

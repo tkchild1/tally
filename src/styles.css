@@ -918,6 +918,48 @@ details.card summary {
   margin-top: 6px;
 }
 
+/* Categories (Settings) and the uncategorized review page */
+.error-text {
+  color: var(--error-text);
+}
+.category-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.category-edit input,
+.add-category input[type='text'] {
+  width: 100%;
+}
+.add-category {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.add-category h3 {
+  margin: 0;
+}
+.review-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+}
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.review-row select {
+  width: 100%;
+}
+
 /* Collapsible dashboard cards */
 .card-collapsible {
   padding-top: 6px;

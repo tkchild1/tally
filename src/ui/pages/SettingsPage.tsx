@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import {
+  addCategory,
+  CategoryNameError,
+  deleteCategory,
   deleteRule,
   eraseAllData,
   listAccounts,
   listCategories,
   listRules,
   renameAccount,
+  renameCategory,
   setCategoryFixed,
   type AccountRow,
+  type CategoryRow,
 } from '../../db/repo';
+import { CATEGORY_NAME_MAX } from '../../lib/categories';
 import { BackupCard, RestoreCard } from '../components/BackupCards';
 import { Card } from '../components/Card';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
@@ -44,31 +50,186 @@ function useAction() {
 }
 
 function CategoriesCard() {
-  const db = useDb();
   const categories = useQuery((d) => listCategories(d), []);
-  const { busy, run } = useAction();
+  const spending = categories.data?.filter((c) => c.kind === 'expense') ?? [];
+  const income = categories.data?.filter((c) => c.kind === 'income') ?? [];
   return (
     <Card title="Categories">
-      <p className="muted small">Fixed costs (rent, insurance, subscriptions) stay about the same each month. The dashboard splits spending into fixed and variable.</p>
+      <p className="muted small">
+        Fixed costs (rent, insurance, subscriptions) stay about the same each month. The dashboard splits spending into fixed
+        and variable. <a href="#/review">Sort uncategorized merchants</a>
+      </p>
+      <h3 className="small muted">Spending</h3>
       <ul className="list">
-        {categories.data
-          ?.filter((c) => c.kind === 'expense')
-          .map((c) => (
-            <li key={c.id} className="list-row">
-              <span>{c.name}</span>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={c.is_fixed}
-                  disabled={busy}
-                  onChange={(e) => run(() => setCategoryFixed(db, c.id, e.target.checked))}
-                />
-                <span>Fixed</span>
-              </label>
-            </li>
-          ))}
+        {spending.map((c) => (
+          <CategoryRowItem key={c.id} category={c} />
+        ))}
       </ul>
+      <h3 className="small muted">Income</h3>
+      <ul className="list">
+        {income.map((c) => (
+          <CategoryRowItem key={c.id} category={c} />
+        ))}
+      </ul>
+      <AddCategoryForm />
     </Card>
+  );
+}
+
+function CategoryRowItem({ category }: { category: CategoryRow }) {
+  const db = useDb();
+  const { busy, run } = useAction();
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(category.name);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setError(null);
+    try {
+      await run(() => renameCategory(db, category.id, name));
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof CategoryNameError ? e.message : 'Could not rename the category.');
+    }
+  }
+
+  if (editing) {
+    return (
+      <li className="category-edit">
+        <label className="field">
+          <span className="visually-hidden">New name for {category.name}</span>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={CATEGORY_NAME_MAX}
+            enterKeyHint="done"
+            onKeyDown={(e) => e.key === 'Enter' && void save()}
+            autoFocus
+          />
+        </label>
+        {error && <p role="alert" className="small error-text">{error}</p>}
+        <div className="row-actions">
+          <button type="button" className="btn btn-small" disabled={busy || !name.trim()} onClick={save}>
+            Save
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary btn-small"
+            onClick={() => {
+              setEditing(false);
+              setName(category.name);
+              setError(null);
+              setConfirmDelete(false);
+            }}
+          >
+            Cancel
+          </button>
+          {category.is_custom &&
+            (confirmDelete ? (
+              <button type="button" className="btn btn-danger btn-small" disabled={busy} onClick={() => run(() => deleteCategory(db, category.id))}>
+                Delete {category.name}
+              </button>
+            ) : (
+              <button type="button" className="btn btn-secondary btn-small" onClick={() => setConfirmDelete(true)}>
+                Delete…
+              </button>
+            ))}
+        </div>
+        {confirmDelete && (
+          <p className="muted small">
+            Its transactions go back to automatic categories (usually Uncategorized), and its rules and budget are removed.
+          </p>
+        )}
+      </li>
+    );
+  }
+
+  return (
+    <li className="list-row">
+      <span className="grow">{category.name}</span>
+      {category.kind === 'expense' && (
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={category.is_fixed}
+            disabled={busy}
+            onChange={(e) => run(() => setCategoryFixed(db, category.id, e.target.checked))}
+          />
+          <span>Fixed</span>
+        </label>
+      )}
+      <button type="button" className="btn btn-secondary btn-small" onClick={() => setEditing(true)} aria-label={`Edit ${category.name}`}>
+        Edit
+      </button>
+    </li>
+  );
+}
+
+function AddCategoryForm() {
+  const db = useDb();
+  const { busy, run } = useAction();
+  const [name, setName] = useState('');
+  const [kind, setKind] = useState<'expense' | 'income'>('expense');
+  const [isFixed, setIsFixed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState<string | null>(null);
+
+  async function add() {
+    setError(null);
+    setAdded(null);
+    try {
+      await run(() => addCategory(db, name, kind, isFixed));
+      setAdded(name.trim());
+      setName('');
+      setIsFixed(false);
+    } catch (e) {
+      setError(e instanceof CategoryNameError ? e.message : 'Could not add the category.');
+    }
+  }
+
+  return (
+    <div className="add-category">
+      <h3 className="small">Add a category</h3>
+      <div className="filters">
+        <label className="grow">
+          <span className="visually-hidden">Category name</span>
+          <input
+            type="text"
+            placeholder="Name, e.g. School & work"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={CATEGORY_NAME_MAX}
+            enterKeyHint="done"
+            onKeyDown={(e) => e.key === 'Enter' && name.trim() && void add()}
+          />
+        </label>
+        <label>
+          <span className="visually-hidden">Type</span>
+          <select value={kind} onChange={(e) => setKind(e.target.value as 'expense' | 'income')}>
+            <option value="expense">Spending</option>
+            <option value="income">Income</option>
+          </select>
+        </label>
+      </div>
+      {kind === 'expense' && (
+        <label className="check">
+          <input type="checkbox" checked={isFixed} onChange={(e) => setIsFixed(e.target.checked)} />
+          <span>Fixed cost (about the same every month)</span>
+        </label>
+      )}
+      {error && <p role="alert" className="small error-text">{error}</p>}
+      {added && (
+        <p role="status" className="small">
+          Added {added}. Pick it for a transaction in Activity, or for a merchant in{' '}
+          <a href="#/review">uncategorized merchants</a>.
+        </p>
+      )}
+      <button type="button" className="btn btn-block" disabled={busy || !name.trim()} onClick={add}>
+        Add category
+      </button>
+    </div>
   );
 }
 
@@ -183,7 +344,7 @@ function EraseCard() {
   const { busy, run } = useAction();
   return (
     <Card title="Erase all data" className="card-danger">
-      <p className="small">Deletes every account, transaction, rule, and subscription choice from this device. This cannot be undone.</p>
+      <p className="small">Deletes every account, transaction, rule, budget, custom category, and subscription choice from this device. This cannot be undone.</p>
       <label className="field">
         <span className="small">
           Type <strong>ERASE</strong> to confirm

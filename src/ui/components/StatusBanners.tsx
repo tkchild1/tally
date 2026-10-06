@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { lastBackupDate } from '../../db/backup';
-import { countTransactions, listTransferHints, markHintAsTransfer } from '../../db/repo';
+import { countTransactions, listTransferHints, markHintAsTransfer, uncategorizedMerchants } from '../../db/repo';
 import { daysBetween, todayISO } from '../../lib/dates';
 import { loadCoverage } from '../coverage';
 import { formatDate, plural } from '../format';
@@ -88,6 +88,18 @@ export function CoverageBanners({ showStale = true }: { showStale?: boolean }) {
         </Banner>
       )}
     </>
+  );
+}
+
+/** Points to the review page while any merchant's spending is uncategorized. */
+export function UncategorizedBanner() {
+  const merchants = useQuery((d) => uncategorizedMerchants(d), []);
+  const count = merchants.data?.length ?? 0;
+  if (count === 0) return null;
+  return (
+    <Banner>
+      {plural(count, 'merchant')} {count === 1 ? 'has' : 'have'} no category. <a href="#/review">Sort them in one place</a>
+    </Banner>
   );
 }
 

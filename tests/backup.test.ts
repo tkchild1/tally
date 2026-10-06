@@ -3,12 +3,17 @@ import { exportBackup, restoreBackup } from '../src/db/backup';
 import { openDb, type Db } from '../src/db/client';
 import { importFile, importFiles } from '../src/db/importer';
 import {
+  addCategory,
   listAccounts,
+  listCategories,
   listMerchantFlags,
   listRules,
   listTransactions,
   renameAccount,
+  renameCategory,
+  setBudget,
   setCategoryFixed,
+  setMerchantCategory,
   setMerchantFlag,
   setTransactionCategory,
 } from '../src/db/repo';
@@ -47,7 +52,7 @@ async function snapshot(db: Db) {
     txns: txns.map((t) => [t.id, t.posted_on, t.amount_cents, t.merchant, t.flow, t.category_id, t.category_source, t.transfer_group]),
     rules: (await listRules(db)).map((r) => [r.pattern, r.category_id, r.matches]),
     flags: [...(await listMerchantFlags(db)).entries()],
-    fixed: (await db.query<{ id: string; is_fixed: boolean }>(`SELECT id, is_fixed FROM categories ORDER BY id`)).rows,
+    categories: (await db.query(`SELECT id, name, kind, is_fixed, is_custom FROM categories ORDER BY id`)).rows,
   };
 }
 
@@ -65,6 +70,10 @@ beforeAll(async () => {
   await setTransactionCategory(source, one.id, 'health', false);
   await setMerchantFlag(source, 'HULU', 'dismissed');
   await setCategoryFixed(source, 'groceries', true);
+  await renameCategory(source, 'education', 'Learning');
+  const custom = await addCategory(source, 'School & work', 'expense', true);
+  await setMerchantCategory(source, 'NETFLIX.COM', custom);
+  await setBudget(source, custom, 5000);
   backup = await exportBackup(source, '2026-01-25T12:00:00.000Z');
 });
 
@@ -73,11 +82,11 @@ describe('backup', () => {
     const counts = backupCounts(backup);
     expect(counts.transactions).toBeGreaterThan(100);
     expect(counts.accounts).toBe(3);
-    expect(counts.merchant_rules).toBe(1);
+    expect(counts.merchant_rules).toBe(2);
     const txn = backup.tables.transactions[0]!;
     expect(txn.posted_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(typeof txn.amount_cents).toBe('number');
-    expect(Object.keys(backup.tables.categories[0]!)).toEqual(['id', 'is_fixed']);
+    expect(Object.keys(backup.tables.categories[0]!)).toEqual(['id', 'name', 'kind', 'is_fixed', 'is_custom']);
     expect(backupFileName('2026-01-25')).toBe('tally-2026-01-25.budgetbackup.json');
   });
 
@@ -124,6 +133,38 @@ describe('backup', () => {
     const r = await importFile(target, 'checking.qfx', CHECKING_EXAMPLE);
     expect(r.ok).toBe(true);
     expect((await tableCounts(target)).imports).toBe(backup.tables.imports.length + 1);
+  });
+
+  it('restores custom categories (with their transactions, rules and budget) and built-in names', async () => {
+    const fresh = await openDb();
+    await restoreBackup(fresh, backup);
+    const cats = await listCategories(fresh);
+    expect(cats.find((c) => c.id === 'education')?.name).toBe('Learning');
+    expect(cats.find((c) => c.name === 'School & work')).toMatchObject({ is_custom: true, is_fixed: true, kind: 'expense' });
+    const movie = (await listTransactions(fresh, { search: 'NETFLIX', limit: 1 }))[0]!;
+    expect(movie.category_name).toBe('School & work');
+  });
+
+  it('a backup from before custom categories restores, and drops custom categories it does not know', async () => {
+    const old: BackupData = {
+      ...backup,
+      tables: {
+        ...backup.tables,
+        categories: backup.tables.categories.filter((c) => !c.is_custom).map((c) => ({ id: c.id, is_fixed: c.is_fixed })),
+        transactions: backup.tables.transactions.filter((t) => !String(t.category_id).startsWith('custom-')),
+        merchant_rules: backup.tables.merchant_rules.filter((r) => !String(r.category_id).startsWith('custom-')),
+        budgets: [],
+      },
+    };
+    const target = await openDb();
+    await addCategory(target, 'Hobbies', 'expense', false);
+    await renameCategory(target, 'dining', 'Eating out');
+    await restoreBackup(target, old);
+    const cats = await listCategories(target);
+    expect(cats.some((c) => c.is_custom)).toBe(false);
+    expect(cats.find((c) => c.id === 'dining')?.name).toBe('Dining');
+    expect(cats.find((c) => c.id === 'education')?.name).toBe('Education');
+    expect(cats.find((c) => c.id === 'groceries')?.is_fixed).toBe(true);
   });
 
   it('a backup that breaks a constraint rolls back and leaves current data alone', async () => {

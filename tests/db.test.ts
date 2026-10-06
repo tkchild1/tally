@@ -27,6 +27,7 @@ describe('migrations', () => {
     await db.exec(`
       UPDATE categories SET name = 'Dining & coffee' WHERE id = 'dining';
       DELETE FROM categories WHERE id = 'tithing';
+      ALTER TABLE categories DROP COLUMN is_custom;
       UPDATE meta SET value = '1' WHERE key = 'schema_version';`);
     await migrate(db);
     const { rows } = await db.query<{ id: string; name: string }>(

@@ -1,4 +1,4 @@
-import { TITHING_CATEGORY, type Flow } from '../lib/categories';
+import { categoryNameProblem, customCategoryId, DEFAULT_CATEGORIES, TITHING_CATEGORY, type Flow } from '../lib/categories';
 import type { AccountKind } from '../lib/qfx';
 import type { MerchantFlag } from '../lib/subscriptions';
 import type { Db, Queryable } from './client';
@@ -146,11 +146,7 @@ export async function setTransactionCategory(db: Db, id: number, categoryId: str
       const { rows } = await tx.query<{ merchant: string }>(`SELECT merchant FROM transactions WHERE id = $1`, [id]);
       const merchant = rows[0]?.merchant;
       if (!merchant) throw new Error('Transaction not found');
-      await tx.query(
-        `INSERT INTO merchant_rules (match_type, pattern, category_id) VALUES ('equals', $1, $2)
-         ON CONFLICT (match_type, pattern) DO UPDATE SET category_id = EXCLUDED.category_id`,
-        [merchant, categoryId],
-      );
+      await upsertMerchantRule(tx, merchant, categoryId);
       await tx.query(`UPDATE transactions SET category_source = 'auto' WHERE id = $1`, [id]);
     } else {
       await tx.query(`UPDATE transactions SET category_id = $2, category_source = 'user' WHERE id = $1`, [id, categoryId]);
@@ -200,11 +196,12 @@ export interface CategoryRow {
   name: string;
   kind: 'income' | 'expense' | 'system';
   is_fixed: boolean;
+  is_custom: boolean;
 }
 
 export async function listCategories(db: Queryable): Promise<CategoryRow[]> {
   const { rows } = await db.query<CategoryRow>(
-    `SELECT id, name, kind, is_fixed FROM categories
+    `SELECT id, name, kind, is_fixed, is_custom FROM categories
      ORDER BY CASE kind WHEN 'income' THEN 0 WHEN 'expense' THEN 1 ELSE 2 END, name`,
   );
   return rows;
@@ -212,6 +209,103 @@ export async function listCategories(db: Queryable): Promise<CategoryRow[]> {
 
 export async function setCategoryFixed(db: Queryable, id: string, isFixed: boolean): Promise<void> {
   await db.query(`UPDATE categories SET is_fixed = $2 WHERE id = $1`, [id, isFixed]);
+}
+
+/** Thrown for a name the user must change; the message is safe to show. */
+export class CategoryNameError extends Error {}
+
+async function otherCategoryNames(db: Queryable, exceptId: string | null): Promise<string[]> {
+  const { rows } = await db.query<{ name: string }>(`SELECT name FROM categories WHERE id IS DISTINCT FROM $1`, [exceptId]);
+  return rows.map((r) => r.name);
+}
+
+/** Adds a custom category and returns its id. */
+export async function addCategory(db: Queryable, name: string, kind: 'expense' | 'income', isFixed: boolean): Promise<string> {
+  const problem = categoryNameProblem(name, await otherCategoryNames(db, null));
+  if (problem) throw new CategoryNameError(problem);
+  const { rows } = await db.query<{ id: string }>(`SELECT id FROM categories`);
+  const id = customCategoryId(name, rows.map((r) => r.id));
+  await db.query(`INSERT INTO categories (id, name, kind, is_fixed, is_custom) VALUES ($1, $2, $3, $4, true)`, [
+    id,
+    name.trim(),
+    kind,
+    kind === 'expense' && isFixed,
+  ]);
+  return id;
+}
+
+/** Renames any category except the built-in Transfer one. */
+export async function renameCategory(db: Queryable, id: string, name: string): Promise<void> {
+  const problem = categoryNameProblem(name, await otherCategoryNames(db, id));
+  if (problem) throw new CategoryNameError(problem);
+  await db.query(`UPDATE categories SET name = $2 WHERE id = $1 AND kind <> 'system'`, [id, name.trim()]);
+}
+
+/**
+ * Deletes a custom category along with its merchant rules and budget. Its transactions go back
+ * to automatic categorization (usually Uncategorized), including ones that were set by hand.
+ */
+export async function deleteCategory(db: Db, id: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    const { rows } = await tx.query<{ kind: string }>(`SELECT kind FROM categories WHERE id = $1 AND is_custom`, [id]);
+    const kind = rows[0]?.kind;
+    if (!kind) throw new Error('Only custom categories can be deleted');
+    const placeholder = kind === 'income' ? 'income_other' : 'uncategorized';
+    await tx.query(`UPDATE transactions SET category_id = $2, category_source = 'auto' WHERE category_id = $1`, [id, placeholder]);
+    await tx.query(`DELETE FROM merchant_rules WHERE category_id = $1`, [id]);
+    await tx.query(`DELETE FROM budgets WHERE category_id = $1`, [id]);
+    await tx.query(`DELETE FROM categories WHERE id = $1`, [id]);
+    await reclassifyAll(tx);
+  });
+}
+
+/** Removes custom categories and restores the built-in names and fixed/variable defaults. */
+export async function resetCategories(db: Queryable): Promise<void> {
+  await db.query(`DELETE FROM categories WHERE is_custom`);
+  await db.query(
+    `UPDATE categories c SET name = d.name, is_fixed = d."isFixed"
+     FROM jsonb_to_recordset($1::jsonb) AS d(id text, name text, "isFixed" boolean)
+     WHERE c.id = d.id`,
+    [JSON.stringify(DEFAULT_CATEGORIES)],
+  );
+}
+
+// ---------- Uncategorized review ----------
+
+export interface UncategorizedMerchantRow {
+  merchant: string;
+  count: number;
+  /** Positive cents spent. */
+  total: number;
+  last: string;
+}
+
+/** Merchants with automatically uncategorized spending, most frequent first. */
+export async function uncategorizedMerchants(db: Queryable): Promise<UncategorizedMerchantRow[]> {
+  const { rows } = await db.query<UncategorizedMerchantRow>(
+    `SELECT merchant, COUNT(*)::int AS count, (-SUM(amount_cents))::int AS total, MAX(posted_on)::text AS last
+     FROM transactions
+     WHERE category_id = 'uncategorized' AND category_source = 'auto' AND flow = 'spend'
+     GROUP BY merchant
+     ORDER BY COUNT(*) DESC, SUM(amount_cents) ASC, merchant`,
+  );
+  return rows;
+}
+
+/** Same as "Apply to all" in the transaction sheet: an equals rule for the merchant, then re-classify. */
+export async function setMerchantCategory(db: Db, merchant: string, categoryId: string): Promise<void> {
+  await db.transaction(async (tx) => {
+    await upsertMerchantRule(tx, merchant, categoryId);
+    await reclassifyAll(tx);
+  });
+}
+
+async function upsertMerchantRule(db: Queryable, merchant: string, categoryId: string): Promise<void> {
+  await db.query(
+    `INSERT INTO merchant_rules (match_type, pattern, category_id) VALUES ('equals', $1, $2)
+     ON CONFLICT (match_type, pattern) DO UPDATE SET category_id = EXCLUDED.category_id`,
+    [merchant, categoryId],
+  );
 }
 
 export interface RuleRow {
@@ -488,5 +582,6 @@ export async function eraseAllData(db: Db): Promise<void> {
     await tx.exec(`
       DELETE FROM transactions; DELETE FROM balance_snapshots; DELETE FROM imports;
       DELETE FROM merchant_rules; DELETE FROM merchant_flags; DELETE FROM budgets; DELETE FROM accounts;`);
+    await resetCategories(tx);
   });
 }

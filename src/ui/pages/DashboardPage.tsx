@@ -22,7 +22,7 @@ import { Card } from '../components/Card';
 import { CollapsibleCard } from '../components/CollapsibleCard';
 import { BalanceChart, CategoryChart, IncomeSpendingChart, MonthlySpendChart } from '../components/Charts';
 import { Money } from '../components/Money';
-import { BackupReminderBanner, CoverageBanners, TransferHintBanners } from '../components/StatusBanners';
+import { BackupReminderBanner, CoverageBanners, TransferHintBanners, UncategorizedBanner } from '../components/StatusBanners';
 import { loadDemoData } from '../demo';
 import { formatDate, formatMonth, plural } from '../format';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
@@ -113,6 +113,7 @@ export function DashboardPage() {
         <>
           <TransferHintBanners />
           <CoverageBanners />
+          <UncategorizedBanner />
           <BackupReminderBanner />
         </>
       )}
