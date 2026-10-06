@@ -12,7 +12,10 @@ import {
   type MonthTotalRow,
 } from '../../db/repo';
 import { balanceSeries } from '../../lib/balance';
+import { todayISO } from '../../lib/dates';
 import { prettyMerchant } from '../../lib/merchant';
+import { loadBudgetSummary } from '../budgets';
+import { BudgetBar } from '../components/BudgetBar';
 import { TITHING_RATE_BP, tithingSummary, type TithingTotals } from '../../lib/tithing';
 import { Banner } from '../components/Banner';
 import { Card } from '../components/Card';
@@ -115,6 +118,7 @@ export function DashboardPage() {
 
       <MonthSummary month={month} filter={filter} />
       {filtered && <FilterSummaryCard filter={filter} label={filterLabel} monthCount={months.data.length} />}
+      {!filtered && <BudgetsCard month={month} />}
       {!filtered && <TithingCard month={month} />}
       {!filtered && <AccountsCard />}
 
@@ -309,6 +313,41 @@ function MonthSummary({ month, filter }: { month: string; filter: DashboardFilte
         )}
       </div>
     </div>
+  );
+}
+
+const DASHBOARD_BUDGETS = 4;
+
+function BudgetsCard({ month }: { month: string }) {
+  const summary = useQuery((d) => loadBudgetSummary(d, month), [month]);
+  const s = summary.data;
+  if (!s) return null;
+  if (s.rows.length === 0) {
+    return (
+      <Card title="Budgets">
+        <p className="small">
+          No budgets yet. <a href="#/budgets">Set a monthly limit</a> for categories like Dining or Shopping.
+        </p>
+      </Card>
+    );
+  }
+  const worst = [...s.rows].sort((a, b) => b.ratio - a.ratio).slice(0, DASHBOARD_BUDGETS);
+  const pace = month === todayISO().slice(0, 7) ? s.monthElapsed : null;
+  return (
+    <Card title={`Budgets, ${formatMonth(month)}`}>
+      <ul className="list">
+        {worst.map((r) => (
+          <li key={r.categoryId} className="budget-item">
+            <BudgetBar row={r} pace={pace} />
+          </li>
+        ))}
+      </ul>
+      <p className="small">
+        <a href="#/budgets">
+          {s.rows.length > worst.length ? `All ${s.rows.length} budgets` : 'Manage budgets'}
+        </a>
+      </p>
+    </Card>
   );
 }
 

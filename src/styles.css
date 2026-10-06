@@ -13,6 +13,8 @@
   --warn-border: #e3a33b;
   --error-bg: #fdecea;
   --error-border: #d0453b;
+  --warn-text: #8a4b00;
+  --error-text: #b3261e;
   --info-bg: #e8f0fb;
   --info-border: #2a78d6;
   --radius: 12px;
@@ -39,6 +41,8 @@
     --warn-border: #c98f2c;
     --error-bg: #3b1d1b;
     --error-border: #e2675e;
+    --warn-text: #f0b45c;
+    --error-text: #f08a82;
     --info-bg: #17263a;
     --info-border: #6aa5ec;
   }
@@ -117,6 +121,33 @@ a {
 .tab[aria-current='page'] {
   color: var(--accent);
   font-weight: 600;
+}
+.tab {
+  min-width: 0;
+}
+.tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-label-short {
+  display: none;
+}
+@media (max-width: 480px) {
+  .tab {
+    font-size: 0.7rem;
+  }
+  .tab-label-long {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .tab-label-short {
+    display: block;
+  }
 }
 .tab-icon {
   width: 24px;
@@ -425,7 +456,7 @@ select {
 /* KPI tiles */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
 }
 .kpi {
@@ -448,6 +479,17 @@ select {
   font-size: 1.35rem;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
+}
+@media (max-width: 480px) {
+  .kpis {
+    gap: 8px;
+  }
+  .kpi {
+    padding: 10px;
+  }
+  .kpi-value {
+    font-size: 1.05rem;
+  }
 }
 .split {
   height: 12px;
@@ -494,6 +536,74 @@ select {
 .totals dd {
   margin: 0;
   font-weight: 600;
+}
+
+.budget-item {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.budget-item:first-child {
+  border-top: none;
+}
+.budget-item .row-actions {
+  margin-top: 8px;
+}
+.budget-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.budget-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.budget-under {
+  color: var(--in);
+}
+.budget-near {
+  color: var(--warn-text);
+}
+.budget-over {
+  color: var(--error-text);
+}
+.budget-track {
+  position: relative;
+  height: 10px;
+  margin: 6px 0 4px;
+  border-radius: 999px;
+  background: var(--chip);
+  overflow: hidden;
+}
+.budget-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.budget-fill-under {
+  background: #1baf7a;
+}
+.budget-fill-near {
+  background: #eb6834;
+}
+.budget-fill-over {
+  background: repeating-linear-gradient(135deg, var(--error-border) 0 6px, #f08a82 6px 10px);
+}
+.budget-pace {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--text);
+}
+.link-button {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+  min-height: 0;
 }
 
 .tithing {

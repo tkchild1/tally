@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 import { acquireTabLock, getBrowserDb, type Db } from './db/client';
 import { Tabs, type TabDef } from './ui/components/Tabs';
 import { DbContext, useHashRoute } from './ui/hooks';
+import { BudgetsPage } from './ui/pages/BudgetsPage';
 import { DashboardPage } from './ui/pages/DashboardPage';
 import { ImportPage } from './ui/pages/ImportPage';
 import { SettingsPage } from './ui/pages/SettingsPage';
@@ -10,8 +11,9 @@ import { TransactionsPage } from './ui/pages/TransactionsPage';
 
 const TABS: TabDef[] = [
   { route: 'dashboard', label: 'Dashboard', iconPath: 'M4 20V10m6 10V4m6 16v-7m4 7H2' },
-  { route: 'transactions', label: 'Transactions', iconPath: 'M4 6h16M4 12h16M4 18h10' },
-  { route: 'subscriptions', label: 'Subscriptions', iconPath: 'M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4' },
+  { route: 'transactions', label: 'Transactions', shortLabel: 'Activity', iconPath: 'M4 6h16M4 12h16M4 18h10' },
+  { route: 'budgets', label: 'Budgets', iconPath: 'M12 3a9 9 0 1 0 9 9h-9zM15 3.5A9 9 0 0 1 20.5 9H15z' },
+  { route: 'subscriptions', label: 'Subscriptions', shortLabel: 'Recurring', iconPath: 'M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4' },
   { route: 'import', label: 'Import', iconPath: 'M12 3v12m0 0l-5-5m5 5l5-5M4 20h16' },
   { route: 'settings', label: 'Settings', iconPath: 'M4 7h10m4 0h2M4 17h4m4 0h8M14 4v6M8 14v6' },
 ];
@@ -19,6 +21,7 @@ const TABS: TabDef[] = [
 const PAGES: Record<string, () => ReactElement> = {
   dashboard: DashboardPage,
   transactions: TransactionsPage,
+  budgets: BudgetsPage,
   subscriptions: SubscriptionsPage,
   import: ImportPage,
   settings: SettingsPage,
@@ -50,7 +53,7 @@ export function App() {
     return (
       <main className="splash">
         <h1>Tally</h1>
-        {status.state === 'opening' && <p className="muted">Opening your dataΓÇª</p>}
+        {status.state === 'opening' && <p className="muted">Opening your data…</p>}
         {status.state === 'locked' && <p>Tally is open in another tab or window. Close it there, then reload this one.</p>}
         {status.state === 'error' && <p role="alert">Could not open the on-device database. Try reloading the page.</p>}
       </main>
