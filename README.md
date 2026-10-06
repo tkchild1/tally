@@ -734,5 +734,20 @@ Milestone 2 added Recharts 3. Milestones 3 and 4 added no dependencies (WebCrypt
   (layout only, no data). Income vs spending and Balance over time start collapsed. Collapsed charts don't query.
 - **Month in progress.** For the current month the KPIs read "Spent so far" and "Net so far", and Income says "None yet"
   (with a neutral, not red, net) until the first paycheck lands.
+- **More default rules.** Dining also matches kinds of places (ice cream, creamery, bakery, bistro, poke, …), Toast's
+  restaurant-only `TST*` prefix, and common national chains; fuel bought at grocery or warehouse stores (`SMITH'S FUEL`,
+  `COSTCO GAS`) is transport, matched before groceries. Rules are generic keywords and chains, never merchants taken from
+  real data. Because classification re-runs on every app open, new defaults also fix older imports (not rows set by hand).
+- **Custom categories (owner addition).** Settings > Categories can add a spending or income category, rename any
+  category (built-in ones too, e.g. Education to "School & work"), and delete custom ones. Deleting sends its transactions
+  back to automatic categories and removes its rules and budget. Names are unique ignoring case, 40 characters max. Custom
+  ids are `custom-<slug>` (migration 3 adds `categories.is_custom`). Erase all data removes custom categories and restores
+  built-in names.
+- **Backups carry categories.** The categories table now exports `id, name, kind, is_fixed, is_custom` (still format
+  version 1). Restore replaces custom categories with the backup's and applies built-in names; older backups (only `id`,
+  `is_fixed`) restore with default names.
+- **"Needs a category" page** (`#/review`, linked from a dashboard and Activity banner while anything is uncategorized):
+  each merchant with automatically uncategorized spending, most frequent first, with a category picker that creates the
+  same `equals` rule as "Apply to all".
 - **Subscription cost uses the latest charge**, not the median (section 9.5 detection still uses the median), so a price
   increase shows in the monthly and yearly totals at once.
