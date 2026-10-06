@@ -436,6 +436,50 @@ export async function lastImportDate(db: Queryable): Promise<string | null> {
   return rows[0]?.d ?? null;
 }
 
+// ---------- Budgets ----------
+
+export interface BudgetRow {
+  category_id: string;
+  name: string;
+  monthly_cents: number;
+}
+
+export async function listBudgets(db: Queryable): Promise<BudgetRow[]> {
+  const { rows } = await db.query<BudgetRow>(
+    `SELECT b.category_id, c.name, b.monthly_cents FROM budgets b JOIN categories c ON c.id = b.category_id ORDER BY c.name`,
+  );
+  return rows;
+}
+
+export async function setBudget(db: Queryable, categoryId: string, monthlyCents: number): Promise<void> {
+  if (!Number.isInteger(monthlyCents) || monthlyCents < 0) throw new Error('Budget must be a whole number of cents >= 0');
+  await db.query(
+    `INSERT INTO budgets (category_id, monthly_cents) VALUES ($1, $2)
+     ON CONFLICT (category_id) DO UPDATE SET monthly_cents = EXCLUDED.monthly_cents`,
+    [categoryId, monthlyCents],
+  );
+}
+
+export async function deleteBudget(db: Queryable, categoryId: string): Promise<void> {
+  await db.query(`DELETE FROM budgets WHERE category_id = $1`, [categoryId]);
+}
+
+export interface CategoryMonthRow {
+  month: string;
+  categoryId: string;
+  totalCents: number;
+}
+
+/** Net spending per category per month (refunds reduce it). */
+export async function categorySpendByMonth(db: Queryable): Promise<CategoryMonthRow[]> {
+  const { rows } = await db.query<CategoryMonthRow>(
+    `SELECT to_char(posted_on, 'YYYY-MM') AS month, category_id AS "categoryId", (-SUM(amount_cents))::int AS "totalCents"
+     FROM transactions WHERE flow = 'spend'
+     GROUP BY 1, 2 ORDER BY 1, 2`,
+  );
+  return rows;
+}
+
 // ---------- Danger zone ----------
 
 /** Delete every account, transaction, import, rule, flag, and budget. Categories stay. */

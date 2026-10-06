@@ -4,8 +4,11 @@ import { importFile, importFiles } from '../src/db/importer';
 import { reclassifyAll } from '../src/db/reclassify';
 import {
   balanceInputs,
+  categorySpendByMonth,
+  deleteBudget,
   deleteRule,
   filterSummary,
+  listBudgets,
   listRules,
   listSpendCharges,
   listTransactions,
@@ -13,7 +16,9 @@ import {
   markHintAsTransfer,
   monthlyTotals,
   setTransactionCategory,
+  setBudget,
   setTransactionFlow,
+  spendingByCategory,
   topMerchants,
 } from '../src/db/repo';
 import { balanceSeries } from '../src/lib/balance';
@@ -191,6 +196,26 @@ describe('Milestone 2 acceptance on demo data', () => {
 
     const both = await filterSummary(db, { search: 'golf', categoryId: 'groceries' });
     expect(both).toMatchObject({ spent: 0, purchases: 0, first: null });
+  });
+
+  it('budgets: set, update, list, delete; per-category monthly spending matches the category chart', async () => {
+    await setBudget(db, 'dining', 30_000);
+    await setBudget(db, 'groceries', 50_000);
+    await setBudget(db, 'dining', 25_000);
+    expect(await listBudgets(db)).toEqual([
+      { category_id: 'dining', name: 'Dining', monthly_cents: 25_000 },
+      { category_id: 'groceries', name: 'Groceries', monthly_cents: 50_000 },
+    ]);
+    await expect(setBudget(db, 'dining', -1)).rejects.toThrow();
+    await expect(setBudget(db, 'dining', 12.5)).rejects.toThrow();
+    await deleteBudget(db, 'dining');
+    expect((await listBudgets(db)).map((b) => b.category_id)).toEqual(['groceries']);
+
+    const byMonth = await categorySpendByMonth(db);
+    const dec = await spendingByCategory(db, '2025-12');
+    for (const c of dec) {
+      expect(byMonth.find((r) => r.month === '2025-12' && r.categoryId === c.category_id)?.totalCents).toBe(c.total);
+    }
   });
 
   it('the balance chart ends at the snapshot values', async () => {
