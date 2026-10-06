@@ -626,30 +626,23 @@ select {
   min-height: 0;
 }
 
-.tithing {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+.tithing-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
 }
-.tithing h3 {
-  margin: 0 0 6px;
-  font-weight: 500;
+.tithing-row:first-child {
+  border-top: none;
+  padding-top: 0;
 }
-.tithing-rows {
-  margin: 0;
-}
-.tithing-rows > div {
+.tithing-head {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  padding: 4px 0;
+  align-items: baseline;
+  gap: 12px;
 }
-.tithing-rows dd {
-  margin: 0;
-}
-.tithing-remaining {
-  border-top: 1px solid var(--border);
-  font-weight: 600;
+.tithing-status {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Charts: themed through CSS so both color schemes stay readable. */

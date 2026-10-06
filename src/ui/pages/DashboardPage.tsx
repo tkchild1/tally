@@ -121,7 +121,6 @@ export function DashboardPage() {
       <MonthSummary month={month} filter={filter} />
       {filtered && <FilterSummaryCard filter={filter} label={filterLabel} monthCount={months.data.length} />}
       {!filtered && <BudgetsCard month={month} />}
-      {!filtered && <TithingCard month={month} />}
       {!filtered && <AccountsCard />}
 
       <CollapsibleCard id="monthly-spending" title={`Monthly spending, ${filterLabel}`}>
@@ -144,6 +143,7 @@ export function DashboardPage() {
           <BalanceSection />
         </CollapsibleCard>
       )}
+      {!filtered && <TithingCard month={month} />}
     </div>
   );
 }
@@ -376,42 +376,49 @@ function TithingCard({ month }: { month: string }) {
         </>
       }
     >
-      <div className="tithing">
-        <TithingColumn label={formatMonth(month)} t={s.month} />
-        <TithingColumn label={`${month.slice(0, 4)} to date`} t={s.yearToDate} />
-      </div>
-      <p className="muted small">
-        Based on income deposited to your accounts. Payments categorized as Tithing count as paid.
-      </p>
+      <ul className="list">
+        <TithingRow label={formatMonth(month)} t={s.month} />
+        <TithingRow label={`${month.slice(0, 4)} to date`} t={s.yearToDate} />
+      </ul>
+      <p className="muted small">Payments in the Tithing category count as paid.</p>
     </CollapsibleCard>
   );
 }
 
-function TithingColumn({ label, t }: { label: string; t: TithingTotals }) {
+function TithingRow({ label, t }: { label: string; t: TithingTotals }) {
+  const ratio = t.owed > 0 ? Math.min(1, t.paid / t.owed) : t.paid > 0 ? 1 : 0;
+  const empty = t.owed === 0 && t.paid === 0;
   return (
-    <section aria-label={`Tithing, ${label}`}>
-      <h3 className="small muted">{label}</h3>
-      <dl className="tithing-rows">
-        <div>
-          <dt>Owed</dt>
-          <dd>
-            <Money cents={t.owed} className="money-neutral" />
-          </dd>
-        </div>
-        <div>
-          <dt>Paid</dt>
-          <dd>
-            <Money cents={t.paid} className="money-neutral" />
-          </dd>
-        </div>
-        <div className="tithing-remaining">
-          <dt>{t.remaining >= 0 ? 'Still to pay' : 'Paid ahead'}</dt>
-          <dd>
-            <Money cents={Math.abs(t.remaining)} className="money-neutral" />
-          </dd>
-        </div>
-      </dl>
-    </section>
+    <li className="tithing-row">
+      <div className="tithing-head">
+        <span>{label}</span>
+        <strong className="tithing-status">
+          {empty ? (
+            'Nothing owed yet'
+          ) : t.remaining > 0 ? (
+            <>
+              <Money cents={t.remaining} className="money-neutral" /> to pay
+            </>
+          ) : t.remaining < 0 ? (
+            <>
+              <Money cents={-t.remaining} className="money-neutral" /> ahead
+            </>
+          ) : (
+            'Paid in full'
+          )}
+        </strong>
+      </div>
+      {!empty && (
+        <>
+          <div className="budget-track" aria-hidden="true">
+            <span className="budget-fill budget-fill-under" style={{ width: `${Math.round(ratio * 100)}%` }} />
+          </div>
+          <div className="muted small">
+            Paid <Money cents={t.paid} className="money-neutral" /> of <Money cents={t.owed} className="money-neutral" />
+          </div>
+        </>
+      )}
+    </li>
   );
 }
 
