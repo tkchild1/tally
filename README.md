@@ -729,3 +729,10 @@ Milestone 2 added Recharts 3. Milestones 3 and 4 added no dependencies (WebCrypt
   Tab inside it and returns focus to the row that opened it, all text meets WCAG AA contrast in light and dark mode, and
   charts stop animating when the system asks for reduced motion. On narrow phones the tab bar shows "Activity" and
   "Recurring" (screen readers still hear the full names).
+- **Collapsible dashboard cards.** Budgets, Tithing, Accounts and every chart can be collapsed; a collapsed card shows a
+  one-line summary (e.g. "2 over budget", "Net after card $X"). The choice is remembered per device in `localStorage`
+  (layout only, no data). Income vs spending and Balance over time start collapsed. Collapsed charts don't query.
+- **Month in progress.** For the current month the KPIs read "Spent so far" and "Net so far", and Income says "None yet"
+  (with a neutral, not red, net) until the first paycheck lands.
+- **Subscription cost uses the latest charge**, not the median (section 9.5 detection still uses the median), so a price
+  increase shows in the monthly and yearly totals at once.
