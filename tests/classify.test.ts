@@ -122,6 +122,21 @@ describe('flow and income', () => {
     const t = txn('card', '2025-12-19', -4000, 'ZZQ HOLDINGS OREM UT');
     expect(classifyTransactions([t], [CARD], [])[0]).toMatchObject({ flow: 'spend', categoryId: 'uncategorized' });
   });
+  it.each([
+    ['DAIRY QUEEN #12345 OREM UT', 'dining'],
+    ['SQ *SOMEPLACE ICE CREAM PROVO UT', 'dining'],
+    ['NORTHSIDE CREAMERY LEHI UT', 'dining'],
+    ['TST* SOMEPLACE KITCHEN PROVO UT', 'dining'],
+    ['SOMEPLACE POKE BOWL OREM UT', 'dining'],
+    ["SMITH'S FUEL #4000 OREM UT", 'transport'],
+    ['COSTCO GAS #0001 OREM UT', 'transport'],
+    ['COSTCO WHSE #0001 OREM UT', 'groceries'],
+    ['DOLLAR TREE OREM UT', 'shopping'],
+    ['SOMETOWN SCHOOL DISTRICT FEES', 'education'],
+  ])('default rules: %s is %s', (raw, categoryId) => {
+    const t = txn('card', '2025-12-19', -1500, raw);
+    expect(classifyTransactions([t], [CARD], [])[0]!.categoryId).toBe(categoryId);
+  });
   it('default rules: UBER EATS is dining, UBER is transport', () => {
     const eats = txn('card', '2025-12-19', -2500, 'UBER EATS HELP.UBER.COM CA');
     const ride = txn('card', '2025-12-19', -1800, 'UBER TRIP HELP.UBER.COM CA');

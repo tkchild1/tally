@@ -66,38 +66,69 @@ export const DEFAULT_RULES: readonly DefaultRule[] = [
   },
   { flow: 'spend', categoryId: 'insurance', pattern: /INSURANCE|STATE FARM|GEICO|PROGRESSIVE|ALLSTATE|LEMONADE/ },
   { flow: 'spend', categoryId: 'housing', pattern: /\bRENT\b|APARTMENTS|PROPERTY MGMT|PROPERTY MANAGEMENT|MORTGAGE|\bHOA\b/ },
+  // Fuel sold by grocery and warehouse stores, before the grocery rule claims it.
+  { flow: 'spend', categoryId: 'transport', pattern: /COSTCO GAS|\bFUEL\b|GASOLINE|GAS STATION|MURPHY USA/ },
   {
     flow: 'spend',
     categoryId: 'groceries',
-    pattern: /WALMART|COSTCO|SMITH'?S|HARMONS|WINCO|KROGER|SAFEWAY|TRADER JOE|WHOLE FOODS|ALDI|SPROUTS|MACEY|GROCER/,
+    pattern:
+      /WALMART|COSTCO|SMITH'?S|HARMONS|WINCO|KROGER|SAFEWAY|TRADER JOE|WHOLE FOODS|ALDI|SPROUTS|MACEY|GROCER|ALBERTSONS|FRED MEYER|PUBLIX|MEIJER|FOOD ?4 ?LESS|SAM'?S ?CLUB|SUPERMARKET/,
   },
   {
     flow: 'spend',
     categoryId: 'dining',
-    pattern:
-      /STARBUCKS|CHIPOTLE|CAFE|COFFEE|\bBEAN\b|DUTCH BROS|MCDONALD|WENDY|TACO|PIZZA|CRUMBL|SWIG|CHICK-FIL-A|SUBWAY|IN-N-OUT|RESTAURANT|GRILL|BURGER|SUSHI/,
+    pattern: new RegExp(
+      [
+        // Kinds of places
+        String.raw`CAFE|COFFEE|\bBEAN\b|RESTAURANT|GRILL|BURGER|SUSHI|TACO|PIZZA|TAQUERIA|CANTINA|\bBBQ\b|BARBECUE|STEAKHOUSE`,
+        String.raw`NOODLE|RAMEN|\bPHO\b|\bPOKE\b|BISTRO|EATERY|\bDINER\b|\bDELI\b|BAKERY|BAGEL|DONUT|DOUGHNUT|WAFFLE|PANCAKE|CREPE`,
+        String.raw`ICE CREAM|CREAMERY|GELATO|FROZEN YOGURT|FROYO|YOGURT|SMOOTHIE|\bSODA\b|COOKIES?\b`,
+        // Toast, a restaurant-only card terminal, prefixes its charges with "TST*".
+        String.raw`\bTST\*`,
+        // National and regional chains
+        String.raw`STARBUCKS|CHIPOTLE|DUTCH BROS|DUNKIN|KRISPY KREME|MCDONALD|WENDY|CHICK-FIL-A|SUBWAY|IN-N-OUT|CRUMBL|SWIG|FIIZ`,
+        String.raw`DAIRY QUEEN|\bDQ\b|BASKIN|COLD STONE|MENCHIE|YOGURTLAND|NOTHING BUNDT|ARBY|BURGER KING|PANDA EXPRESS|PANERA`,
+        String.raw`CULVER|\bSONIC\b|JACK IN THE BOX|CARL'?S JR|FIVE GUYS|SHAKE SHACK|RAISING CANE|POPEYES|\bKFC\b|DOMINO|PAPA JOHN`,
+        String.raw`PAPA MURPHY|LITTLE CAESAR|JERSEY MIKE|JIMMY JOHN|FIREHOUSE SUBS|COSTA VIDA|ZUPAS|BAJIO|QDOBA|WINGSTOP|WINGERS`,
+        String.raw`APPLEBEE|CHILI'?S|OLIVE GARDEN|RED ROBIN|\bIHOP\b|DENNY'?S|CRACKER BARREL|OUTBACK|TEXAS ROADHOUSE`,
+        String.raw`CHEESECAKE FACTORY|BUFFALO WILD|JAMBA|SWEETGREEN|\bCAVA\b|PEI WEI|P\.? ?F\.? CHANG`,
+      ].join('|'),
+    ),
   },
   {
     flow: 'spend',
     categoryId: 'transport',
-    pattern: /\bUBER\b|\bLYFT\b|\bSHELL\b|CHEVRON|MAVERIK|EXXON|SINCLAIR|PHILLIPS 66|CIRCLE K|7-ELEVEN|\bFUEL\b|PARKING|\bUTA\b|JIFFY LUBE/,
+    pattern:
+      /\bUBER\b|\bLYFT\b|\bSHELL\b|CHEVRON|MAVERIK|EXXON|SINCLAIR|PHILLIPS 66|CIRCLE K|7-ELEVEN|TEXACO|CONOCO|HOLIDAY STATION|SPEEDWAY|QUIKTRIP|\bARCO\b|VALERO|TESLA SUPERCHARG|PARKING|\bUTA\b|JIFFY LUBE|CAR ?WASH|AUTOZONE|O'?REILLY AUTO|NAPA AUTO|DISCOUNT TIRE|LES SCHWAB|\bDMV\b|MOTOR VEHICLE|\bTOLL/,
   },
   {
     flow: 'spend',
     categoryId: 'shopping',
-    pattern: /AMAZON|AMZN|TARGET|BEST BUY|BARNES|IKEA|HOME DEPOT|LOWE'?S|ETSY|EBAY|NORDSTROM|OLD NAVY|KOHL'?S|ROSS STORES/,
+    pattern:
+      /AMAZON|AMZN|TARGET|BEST BUY|BARNES|IKEA|HOME DEPOT|LOWE'?S|ETSY|EBAY|NORDSTROM|OLD NAVY|KOHL'?S|ROSS STORES|DOLLAR TREE|DOLLAR GENERAL|FAMILY DOLLAR|FIVE BELOW|MARSHALLS|T\.?J\.? ?MAXX|HOMEGOODS|BURLINGTON|\bMACY|DICK'?S SPORTING|SCHEELS|\bREI\b|BATH & BODY|SEPHORA|\bULTA\b|APPLE STORE|MICHAELS|HOBBY LOBBY|JOANN|SHEIN|TEMU|\bZARA\b|\bH&M\b|\bGAP\b|AMERICAN EAGLE|DILLARD|PENNEY|WAYFAIR|CHEWY|PETSMART|PETCO|STAPLES|OFFICE DEPOT|GAMESTOP/,
   },
   {
     flow: 'spend',
     categoryId: 'entertainment',
-    pattern: /GOLF|BOWL|CINEMA|CINEMARK|MEGAPLEX|THEATRE|THEATER|STEAM|NINTENDO|PLAYSTATION|XBOX|TICKETMASTER/,
+    pattern:
+      /GOLF|BOWL|CINEMA|CINEMARK|MEGAPLEX|THEATRE|THEATER|\bAMC\b|REGAL|FANDANGO|STEAM|NINTENDO|PLAYSTATION|XBOX|TICKETMASTER|STUBHUB|SEATGEEK|EVENTBRITE|DAVE ?& ?BUSTER|TRAMPOLINE|ARCADE|LASER TAG|ESCAPE ROOM|ROLLER|SKATE|MUSEUM|\bZOO\b|AQUARIUM|CONCERT|LIFT TICKET|\bSKI\b/,
   },
-  { flow: 'spend', categoryId: 'health', pattern: /PHARMACY|\bCVS\b|WALGREENS|DENTAL|CLINIC|HOSPITAL|MEDICAL|DOCTOR|OPTOMETR/ },
-  { flow: 'spend', categoryId: 'education', pattern: /TUITION|UNIVERSITY|COLLEGE|BOOKSTORE|COURSERA|UDEMY/ },
+  {
+    flow: 'spend',
+    categoryId: 'health',
+    pattern:
+      /PHARMACY|\bCVS\b|WALGREENS|DENTAL|DENTIST|ORTHODONT|CLINIC|HOSPITAL|MEDICAL|DOCTOR|OPTOMETR|URGENT CARE|INSTACARE|CHIROPRACT|THERAP|LABCORP|QUEST DIAG|DERMATOL|PEDIATRIC|EYE CARE/,
+  },
+  {
+    flow: 'spend',
+    categoryId: 'education',
+    pattern: /TUITION|UNIVERSITY|COLLEGE|BOOKSTORE|COURSERA|UDEMY|\bSCHOOL|TEXTBOOK|CHEGG|PEARSON|MCGRAW|CENGAGE|QUIZLET/,
+  },
   {
     flow: 'spend',
     categoryId: 'travel',
-    pattern: /AIRLINE|DELTA AIR|SOUTHWEST|UNITED AIR|FRONTIER|HOTEL|MARRIOTT|HILTON|AIRBNB|EXPEDIA/,
+    pattern:
+      /AIRLINE|DELTA AIR|SOUTHWEST|UNITED AIR|AMERICAN AIR|ALASKA AIR|JETBLUE|ALLEGIANT|SPIRIT AIR|FRONTIER|HOTEL|MARRIOTT|HILTON|\bINN\b|AIRBNB|VRBO|EXPEDIA|BOOKING\.COM|HOTELS\.COM|HERTZ|ENTERPRISE RENT|\bAVIS\b|TURO/,
   },
   { flow: 'spend', categoryId: 'fees', pattern: /\bFEE\b|INTEREST CHARGE|FINANCE CHARGE|OVERDRAFT|SERVICE CHARGE/ },
 ];
@@ -107,3 +138,31 @@ export const NOT_AUTO_SUBSCRIPTION: ReadonlySet<string> = new Set(['groceries', 
 
 /** Spending in this category counts as tithing paid on the dashboard. */
 export const TITHING_CATEGORY = 'tithing';
+
+export const CATEGORY_NAME_MAX = 40;
+
+/** A user-facing problem with a category name, or null if it can be used. Names are unique ignoring case. */
+export function categoryNameProblem(name: string, otherNames: Iterable<string>): string | null {
+  const trimmed = name.trim();
+  if (!trimmed) return 'Enter a name.';
+  if (trimmed.length > CATEGORY_NAME_MAX) return `Use at most ${CATEGORY_NAME_MAX} characters.`;
+  const lower = trimmed.toLowerCase();
+  for (const other of otherNames) if (other.trim().toLowerCase() === lower) return 'A category with that name already exists.';
+  return null;
+}
+
+/** Stable id for a new custom category: "custom-" plus a slug of the name, made unique. */
+export function customCategoryId(name: string, existingIds: Iterable<string>): string {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 30);
+  const base = `custom-${slug || 'category'}`;
+  const taken = new Set(existingIds);
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base}-${n}`)) n++;
+  return `${base}-${n}`;
+}
