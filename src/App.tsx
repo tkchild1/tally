@@ -42,13 +42,15 @@ export function App() {
     };
   }, []);
 
-  useEffect(() => window.scrollTo(0, 0), [route]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [route]);
 
   if (status.state !== 'ready') {
     return (
       <main className="splash">
         <h1>Tally</h1>
-        {status.state === 'opening' && <p className="muted">Opening your data…</p>}
+        {status.state === 'opening' && <p className="muted">Opening your dataΓÇª</p>}
         {status.state === 'locked' && <p>Tally is open in another tab or window. Close it there, then reload this one.</p>}
         {status.state === 'error' && <p role="alert">Could not open the on-device database. Try reloading the page.</p>}
       </main>
