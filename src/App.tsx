@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactElement } from 'react';
 import { acquireTabLock, getBrowserDb, type Db } from './db/client';
 import { ErrorBoundary } from './ui/components/ErrorBoundary';
 import { Tabs, type TabDef } from './ui/components/Tabs';
@@ -27,6 +27,12 @@ const PAGES: Record<string, () => ReactElement> = {
   import: ImportPage,
   settings: SettingsPage,
 };
+
+/** The hash is the router, so the skip link moves focus itself instead of navigating to #main. */
+function skipToMain(e: MouseEvent<HTMLAnchorElement>) {
+  e.preventDefault();
+  document.getElementById('main')?.focus();
+}
 
 type Status = { state: 'opening' } | { state: 'ready'; db: Db } | { state: 'locked' } | { state: 'error' };
 
@@ -65,8 +71,11 @@ export function App() {
   const Page = PAGES[active]!;
   return (
     <DbContext.Provider value={status.db}>
+      <a className="skip-link" href="#main" onClick={skipToMain}>
+        Skip to content
+      </a>
       <Tabs tabs={TABS} active={active} />
-      <main className="content">
+      <main className="content" id="main" tabIndex={-1}>
         <ErrorBoundary key={active}>
           <Page />
         </ErrorBoundary>

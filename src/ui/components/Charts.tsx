@@ -21,6 +21,8 @@ import { formatCompactCents, formatDate, formatDateShort, formatMonth } from '..
 /** Color-blind-safe categorical palette (README section 10). Never the only signal. */
 export const PALETTE = { blue: '#2a78d6', orange: '#eb6834', aqua: '#1baf7a' } as const;
 
+const animate = !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+
 const money = (v: unknown) => (typeof v === 'number' ? formatCents(v) : String(v));
 
 function DataTable({ caption, head, rows }: { caption: string; head: string[]; rows: string[][] }) {
@@ -62,8 +64,8 @@ export function IncomeSpendingChart({ data }: { data: MonthTotalRow[] }) {
             <YAxis tickFormatter={formatCompactCents} width={52} tickLine={false} axisLine={false} />
             <Tooltip formatter={money} labelFormatter={(_, p) => (p[0] ? formatMonth(p[0].payload.month) : '')} />
             <Legend />
-            <Bar dataKey="income" name="Income" fill={PALETTE.aqua} radius={[3, 3, 0, 0]} />
-            <Bar dataKey="spending" name="Spending" fill={PALETTE.blue} radius={[3, 3, 0, 0]} />
+            <Bar dataKey="income" name="Income" fill={PALETTE.aqua} radius={[3, 3, 0, 0]} isAnimationActive={animate} />
+            <Bar dataKey="spending" name="Spending" fill={PALETTE.blue} radius={[3, 3, 0, 0]} isAnimationActive={animate} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -90,7 +92,7 @@ export function MonthlySpendChart({ data, selected, label }: { data: MonthTotalR
             <YAxis tickFormatter={formatCompactCents} width={52} tickLine={false} axisLine={false} />
             <Tooltip formatter={money} labelFormatter={(_, p) => (p[0] ? formatMonth(p[0].payload.month) : '')} />
             <ReferenceLine y={average} stroke={PALETTE.orange} strokeDasharray="6 4" />
-            <Bar dataKey="spending" name="Spent" radius={[3, 3, 0, 0]}>
+            <Bar dataKey="spending" name="Spent" radius={[3, 3, 0, 0]} isAnimationActive={animate}>
               {rows.map((r) => (
                 <Cell key={r.month} fill={PALETTE.blue} fillOpacity={r.month === selected ? 1 : 0.45} />
               ))}
@@ -120,7 +122,7 @@ export function CategoryChart({ data }: { data: CategorySpendRow[] }) {
             <XAxis type="number" hide />
             <YAxis type="category" dataKey="label" width={150} tickLine={false} axisLine={false} interval={0} />
             <Tooltip formatter={money} />
-            <Bar dataKey="total" name="Spent" fill={PALETTE.blue} radius={[0, 3, 3, 0]}>
+            <Bar dataKey="total" name="Spent" fill={PALETTE.blue} radius={[0, 3, 3, 0]} isAnimationActive={animate}>
               <LabelList dataKey="total" position="right" formatter={(v: unknown) => money(v)} className="bar-label" />
             </Bar>
           </BarChart>
@@ -148,8 +150,9 @@ export function BalanceChart({ data }: { data: BalancePoint[] }) {
             <YAxis tickFormatter={formatCompactCents} width={56} tickLine={false} axisLine={false} />
             <Tooltip formatter={money} labelFormatter={(d) => formatDate(String(d))} />
             <Legend />
-            <Line type="stepAfter" dataKey="cash" name="Cash" stroke={PALETTE.aqua} strokeWidth={2} dot={false} />
+            <Line type="stepAfter" dataKey="cash" name="Cash" stroke={PALETTE.aqua} strokeWidth={2} dot={false} isAnimationActive={animate} />
             <Line
+              isAnimationActive={animate}
               type="stepAfter"
               dataKey="net"
               name="Net (after card)"

@@ -817,8 +817,8 @@ input:focus-visible {
   border-radius: 10px;
 }
 .btn-danger {
-  background: var(--error-border);
-  color: #fff;
+  background: var(--error-text);
+  color: var(--surface);
 }
 .card-danger {
   border-color: var(--error-border);
@@ -830,7 +830,7 @@ input:focus-visible {
   margin-bottom: 0;
 }
 .gap-flag {
-  color: var(--warn-border);
+  color: var(--warn-text);
 }
 
 .grow {
@@ -891,6 +891,34 @@ details.card summary {
 .sub-actions {
   display: flex;
   gap: 6px;
+}
+
+a:focus-visible,
+summary:focus-visible,
+.btn-icon:focus-visible,
+.link-button:focus-visible,
+input[type='checkbox']:focus-visible {
+  outline: 3px solid var(--info-border);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -100px;
+  z-index: 100;
+  background: var(--surface);
+  color: var(--accent);
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.skip-link:focus {
+  top: 8px;
+}
+.content:focus {
+  outline: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

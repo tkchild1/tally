@@ -13,6 +13,24 @@ import { formatDate, FLOW_LABEL } from '../format';
 import { bumpDataVersion, useDb, useQuery } from '../hooks';
 import { Money } from './Money';
 
+const FOCUSABLE = 'button:not(:disabled), select:not(:disabled), input:not(:disabled), a[href]';
+
+/** Keeps Tab and Shift+Tab cycling inside the open sheet. */
+function trapTab(e: KeyboardEvent, root: HTMLElement) {
+  const items = [...root.querySelectorAll<HTMLElement>(FOCUSABLE)];
+  const first = items[0];
+  const last = items[items.length - 1];
+  if (!first || !last) return;
+  const current = document.activeElement;
+  if (e.shiftKey && (current === first || current === root)) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && current === last) {
+    e.preventDefault();
+    first.focus();
+  }
+}
+
 /** Bottom sheet for inspecting and correcting one transaction. */
 export function TransactionSheet({ txn, onClose }: { txn: TransactionRow; onClose: () => void }) {
   const db = useDb();
@@ -29,12 +47,22 @@ export function TransactionSheet({ txn, onClose }: { txn: TransactionRow; onClos
   const isTracked = tracked ?? flags.data?.get(txn.merchant) === 'confirmed';
   const pretty = prettyMerchant(txn.merchant);
 
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialogRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return onCloseRef.current();
+      if (e.key === 'Tab' && dialogRef.current) trapTab(e, dialogRef.current);
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      opener?.focus();
+    };
+  }, []);
 
   async function save() {
     setSaving(true);
